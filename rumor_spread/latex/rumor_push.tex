@@ -1,0 +1,557 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2.8cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\renewcommand{\Pr}{\mathbb{P}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Ical}{\mathcal{I}}
+\newcommand{\Fcal}{\mathcal{F}}
+\newcommand{\ceil}[1]{\left\lceil #1 \right\rceil}
+
+\title{Rumor spreading by uniform push on the complete graph:\\
+a formalization-oriented proof of the $O(\log n)$ bound}
+\author{Aakash Kumar, Maria Sofia Bucarelli, Emanuele Natale}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We give a complete and elementary proof that the uniform \emph{push} protocol
+on the complete graph $K_n$, started from a single informed node, informs all
+$n$ nodes within $O(\log n)$ rounds with high probability.  The proof is
+deliberately optimized for formalization in a proof assistant (Lean~4 +
+Mathlib): the probability space is finite and uniform; the only analytic
+ingredients are Bernoulli's inequality and Markov's inequality; concentration
+in the growth phase is obtained from a one-line exponential-moment induction
+for adaptive Bernoulli trials, avoiding both Chernoff bounds for sums of
+independent variables and stochastic-domination couplings.  No use is made of
+the exponential function, of continuous probability, or of martingale theory.
+Constants are deliberately crude.
+
+\smallskip
+\noindent
+This argument has been \emph{fully formalized} (no \texttt{sorry}) in the
+accompanying Lean development (\texttt{RumorSpread/}); the main theorem is
+\texttt{RumorPush.push\_informs\_all\_whp}.
+\end{abstract}
+
+\section{The model}\label{sec:model}
+
+Fix $n \ge 2$ and let $V = \{0,1,\dots,n-1\}$ be the vertex set of the
+complete graph $K_n$.
+
+\begin{definition}[Round randomness]\label{def:round}
+A \emph{round configuration} is a function
+$\omega \colon V \to V$ with $\omega(v) \ne v$ for all $v$.
+Let $R_n$ denote the (finite) set of round configurations; it carries the
+uniform probability measure, i.e.\ every node picks a uniformly random
+\emph{target} among the other $n-1$ nodes, independently of all other nodes.
+\end{definition}
+
+\begin{definition}[Push step]\label{def:step}
+For an \emph{informed set} $I \subseteq V$ and a round configuration
+$\omega \in R_n$, the next informed set is
+\[
+  \mathrm{step}(I,\omega) \;=\; I \,\cup\, \omega(I)
+  \;=\; I \cup \{\omega(v) : v \in I\}.
+\]
+(Only informed nodes actually transmit; letting \emph{all} nodes draw a target
+and ignoring the choices of uninformed nodes is an equivalent and
+formalization-friendlier convention.)
+\end{definition}
+
+\begin{definition}[Process]\label{def:process}
+Fix a horizon $T \in \N$ and a start vertex $v_0 \in V$. The sample space is
+\[
+  \Omega \;=\; R_n^{\,T}
+  \quad\text{(uniform measure, i.e.\ i.i.d.\ uniform rounds).}
+\]
+For $\omega = (\omega_0,\dots,\omega_{T-1}) \in \Omega$ define
+$I_0(\omega) = \{v_0\}$ and
+$I_{t+1}(\omega) = \mathrm{step}(I_t(\omega), \omega_t)$ for $0 \le t < T$.
+We write $m_t = |I_t|$ and $U_t = n - m_t$ for the numbers of informed and
+uninformed nodes.  Since $\Omega$ is finite, all probabilities are finite
+ratios and all expectations are finite sums; ``conditioning on
+$I_t$'' means partitioning $\Omega$ according to the first $t$ coordinates.
+\end{definition}
+
+Two trivial but load-bearing facts, both immediate from
+Definition~\ref{def:step}:
+
+\begin{lemma}[Monotonicity]\label{lem:mono}
+$I_t(\omega) \subseteq I_{t+1}(\omega)$ for all $t$ and all $\omega$; hence
+$m_t$ is non-decreasing and $U_t$ is non-increasing in $t$, pointwise on
+$\Omega$.
+\end{lemma}
+
+\begin{lemma}[At most doubling]\label{lem:atmost}
+$|I_{t+1}(\omega) \setminus I_t(\omega)| \le |I_t(\omega)|$, i.e.\ the number
+$N_t := m_{t+1}-m_t$ of newly informed nodes in one round satisfies
+$0 \le N_t \le m_t$.
+\end{lemma}
+
+\section{Main theorem}
+
+Throughout, $\log$ denotes the natural logarithm.
+
+\begin{theorem}[Push protocol informs $K_n$ in $O(\log n)$ rounds w.h.p.]
+\label{thm:main}
+Let $n \ge 2$, let $v_0 \in V$, and set
+\[
+  T_1 \;=\; \ceil{117 \log n} + 23, \qquad
+  T_2 \;=\; \ceil{6 \log n}, \qquad
+  T \;=\; T_1 + T_2 .
+\]
+Then
+\[
+  \Pr\bigl[\, I_T = V \,\bigr] \;\ge\; 1 - \frac{2}{n}.
+\]
+In particular all nodes are informed after $O(\log n)$ rounds with high
+probability.
+\end{theorem}
+
+\begin{remark}
+The constants are deliberately crude: the proof is organized to minimize the
+analytic toolkit, not the round count.  The sharp answer is
+$\log_2 n + \log n + o(\log n)$ (Frieze--Grimmett 1985, Pittel 1987).
+Replacing $2/n$ by $n^{-\alpha}$ for any fixed $\alpha \ge 1$ only changes the
+constants in $T_1, T_2$.
+\end{remark}
+
+The proof has two phases, glued by Lemma~\ref{lem:mono}:
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Growth phase} (Section~\ref{sec:growth}): while $m_t \le n/2$,
+  each round multiplies $m_t$ by $\ge 9/8$ with probability $\ge 1/8$;
+  an exponential-moment bound for adaptive trials shows that after $T_1$
+  rounds, $m_{T_1} > n/2$ except with probability $\le 1/n$.
+\item \textbf{Saturation phase} (Section~\ref{sec:saturation}): once
+  $m_t \ge n/2$, the expected number of uninformed nodes contracts by a factor
+  $2/3$ per round; after $T_2$ further rounds Markov's inequality gives
+  $U_T = 0$ except with probability $\le 1/n$.
+\end{itemize}
+
+\section{Elementary inequalities}\label{sec:ineq}
+
+Everything in this section is deterministic real arithmetic.  We write
+$x := \tfrac{1}{n-1}$, so $0 < x \le 1$ for $n \ge 2$.
+
+\begin{lemma}[Bernoulli]\label{lem:bernoulli}
+For all real $y \ge -1$ (we only use $y\in[-1,1]$) and $m \in \N$:
+$(1+y)^m \ge 1 + my$.
+\end{lemma}
+
+\begin{proof}
+Induction on $m$; available in Mathlib as \texttt{one\_add\_mul\_le\_pow}.
+\end{proof}
+
+\begin{lemma}[Second-order lower bound, ``Bonferroni'']\label{lem:bonferroni}
+For $0 \le x \le 1$ and $m \in \N$:
+\[
+  1-(1-x)^m \;\ge\; mx - \binom{m}{2}x^2 \;\ge\; mx\Bigl(1-\frac{mx}{2}\Bigr).
+\]
+\end{lemma}
+
+\begin{proof}
+Induction on $m$. The case $m=0$ is trivial. For the step, using
+Lemma~\ref{lem:bernoulli} in the form $(1-x)^m \ge 1-mx$:
+\[
+  1-(1-x)^{m+1} = \bigl(1-(1-x)^m\bigr) + x(1-x)^m
+  \ge \Bigl(mx - \tbinom{m}{2}x^2\Bigr) + x(1-mx)
+  = (m+1)x - \tbinom{m+1}{2}x^2 ,
+\]
+since $\binom{m}{2}+m = \binom{m+1}{2}$. The second inequality is
+$\binom{m}{2} \le m^2/2$.
+\end{proof}
+
+\begin{lemma}[Upper bound without $e$]\label{lem:upper}
+For $0 \le x \le 1$ and $m \in \N$:
+\[
+  (1-x)^m \;\le\; \frac{1}{1+mx}.
+\]
+\end{lemma}
+
+\begin{proof}
+$(1-x)(1+x) = 1-x^2 \le 1$, so $(1-x)^m (1+x)^m \le 1$, and
+$(1+x)^m \ge 1+mx > 0$ by Lemma~\ref{lem:bernoulli}; divide.
+\end{proof}
+
+\begin{lemma}[Logarithm bounds]\label{lem:logbounds}
+For $x > 0$: $\;1 - \tfrac1x \le \log x \le x - 1$.
+\end{lemma}
+
+\begin{proof}
+The right inequality is standard (concavity of $\log$, in Mathlib as
+\texttt{Real.log\_le\_sub\_one\_of\_pos}); the left follows by applying it to
+$1/x$.  These two bounds, together with Mathlib's numeric bound
+$\log 2 < 0.6931471808$, are the only facts about $\log$ used in the numeric
+verification of Lemma~\ref{lem:phase1}; in particular
+$\log\tfrac98 \ge \tfrac19$, $\log\tfrac{16}{15} \ge \tfrac1{16}$ and
+$\log\tfrac32 \ge \tfrac13$.
+\end{proof}
+
+\begin{lemma}[Markov's inequality, finite uniform version]\label{lem:markov}
+Let $\Omega$ be a finite nonempty set with the uniform measure, $f \colon
+\Omega \to \R$ with $f \ge 0$, and $a > 0$.  Then
+$\Pr[f \ge a] \le \E[f]/a$.  In particular, if $f$ takes values in $\N$, then
+$\Pr[f \ne 0] \le \E[f]$.
+\end{lemma}
+
+\begin{lemma}[Reverse Markov for bounded variables]\label{lem:revmarkov}
+Let $f \colon \Omega \to \R$ with $0 \le f \le b$ pointwise, $b > 0$, and let
+$0 < a < b$.  Then
+\[
+  \Pr[f \ge a] \;\ge\; \frac{\E[f] - a}{b}.
+\]
+\end{lemma}
+
+\begin{proof}
+$\E[f] \le a\,\Pr[f<a] + b\,\Pr[f\ge a] \le a + b\,\Pr[f \ge a]$.
+\end{proof}
+
+\section{One-round estimates}\label{sec:oneround}
+
+Fix an informed set $I$ with $|I| = m \ge 1$ and let $\omega \in R_n$ be a
+uniform round configuration.  All statements in this section concern this
+single round (one uniform draw from $R_n$); by independence of the rounds they
+apply verbatim to the conditional law of round $t$ given $I_t = I$.
+
+\begin{lemma}[Contact probability]\label{lem:contact}
+For any fixed $u \notin I$,
+\[
+  \Pr_\omega\bigl[u \in \mathrm{step}(I,\omega)\bigr]
+  \;=\; 1 - \Bigl(1-\frac{1}{n-1}\Bigr)^{m}.
+\]
+\end{lemma}
+
+\begin{proof}
+$u \notin \mathrm{step}(I,\omega)$ iff $\omega(v) \ne u$ for every $v \in I$.
+The coordinates $(\omega(v))_{v \in I}$ are independent and uniform on
+$V \setminus \{v\}$, and $u \ne v$ for $v\in I$, so each misses $u$ with
+probability exactly $1 - \frac1{n-1}$; multiply over $v \in I$.
+(Formally: count the functions $\omega$ avoiding $u$ on $I$; the count
+factorizes coordinate-by-coordinate.)
+\end{proof}
+
+\begin{lemma}[Expected growth while below half]\label{lem:expgrowth}
+Let $N(\omega) = |\mathrm{step}(I,\omega)| - m$ be the number of newly
+informed nodes.  If $1 \le m \le n/2$, then
+\[
+  \E_\omega[N] \;\ge\; \frac{m}{4}.
+\]
+\end{lemma}
+
+\begin{proof}
+Write $x = \frac1{n-1}$. By linearity of expectation over the $n-m$
+uninformed nodes and Lemma~\ref{lem:contact},
+$\E[N] = (n-m)\bigl(1-(1-x)^m\bigr)$.
+Since $m \le n/2$ and $n \ge 2$ we have
+$mx = \frac{m}{n-1} \le \frac{n}{2(n-1)} \le 1$,
+so Lemma~\ref{lem:bonferroni} gives
+$1-(1-x)^m \ge mx(1-\tfrac{mx}{2}) \ge \tfrac{mx}{2}$.
+Using $n - m \ge n/2$:
+\[
+  \E[N] \;\ge\; \frac{n}{2}\cdot\frac{m}{2(n-1)}
+  \;=\; \frac{m}{4}\cdot\frac{n}{n-1} \;\ge\; \frac{m}{4}. \qedhere
+\]
+\end{proof}
+
+\begin{lemma}[A good round has constant probability]\label{lem:goodround}
+If $1 \le m \le n/2$, then
+\[
+  \Pr_\omega\Bigl[\,|\mathrm{step}(I,\omega)| \ge \tfrac{9}{8}\,m\,\Bigr]
+  \;\ge\; \frac18 .
+\]
+\end{lemma}
+
+\begin{proof}
+$N$ satisfies $0 \le N \le m$ (Lemma~\ref{lem:atmost}) and $\E[N] \ge m/4$
+(Lemma~\ref{lem:expgrowth}).  By Lemma~\ref{lem:revmarkov} with $a = m/8$,
+$b = m$:
+\[
+  \Pr\bigl[N \ge \tfrac{m}{8}\bigr] \;\ge\; \frac{m/4 - m/8}{m} = \frac18 .
+  \qedhere
+\]
+\end{proof}
+
+\begin{lemma}[Contraction above half]\label{lem:contract}
+If $m \ge n/2$, then for every fixed $u \notin I$,
+\[
+  \Pr_\omega\bigl[u \notin \mathrm{step}(I,\omega)\bigr]
+  \;=\; \Bigl(1-\frac1{n-1}\Bigr)^m \;\le\; \frac23 ,
+\]
+and consequently, with $U' := n - |\mathrm{step}(I,\omega)|$,
+\[
+  \E_\omega[U'] \;\le\; \frac23\,(n-m).
+\]
+\end{lemma}
+
+\begin{proof}
+By Lemma~\ref{lem:upper}, $(1-x)^m \le \frac{1}{1+mx}$, and
+$mx = \frac{m}{n-1} \ge \frac{n}{2(n-1)} \ge \frac12$, so
+$(1-x)^m \le \frac{1}{3/2} = \frac23$.  Summing over the $n-m$ uninformed
+nodes gives the expectation bound.
+\end{proof}
+
+\section{Adaptive Bernoulli trials: an exponential-moment bound}
+\label{sec:adaptive}
+
+The only ``concentration'' tool we need.  We state it for our concrete finite
+product space; $\Fcal_t$-measurable simply means ``a function of the first $t$
+coordinates of $\omega \in \Omega = R_n^T$''.
+
+\begin{lemma}[Exponential moment for adaptive trials]\label{lem:adaptive}
+Let $X_0, \dots, X_{T-1} \colon \Omega \to \{0,1\}$ be such that $X_t$ is a
+function of $(\omega_0,\dots,\omega_t)$, and suppose there is $p \in [0,1]$
+such that for every $t$ and every fixed prefix
+$(\omega_0,\dots,\omega_{t-1})$,
+\[
+  \Pr\bigl[X_t = 1 \,\big|\, \omega_0,\dots,\omega_{t-1}\bigr] \;\ge\; p .
+\]
+Let $G = \sum_{t<T} X_t$.  Then for every $s \in (0,1]$,
+\[
+  \E\bigl[s^{\,G}\bigr] \;\le\; \bigl(1 - p(1-s)\bigr)^{T}.
+\]
+\end{lemma}
+
+\begin{proof}
+Induction on $T$.  For $T=0$ both sides are $1$.  For the step, condition on
+the first $T$ coordinates: with $G' = \sum_{t<T} X_t$,
+\[
+  \E\bigl[s^{G'+X_T}\bigr]
+  = \E\Bigl[\, s^{G'} \cdot \E\bigl[s^{X_T} \mid \omega_0,\dots,\omega_{T-1}\bigr] \Bigr],
+\]
+and pointwise
+$\E[s^{X_T} \mid \cdot\,] = 1 - q(1-s) \le 1 - p(1-s)$
+where $q = \Pr[X_T = 1 \mid \cdot\,] \ge p$ and $1-s \ge 0$.  Since $s^{G'}
+\ge 0$, the induction hypothesis applies to the outer expectation.
+\end{proof}
+
+\begin{corollary}[Lower tail]\label{cor:tail}
+In the setting of Lemma~\ref{lem:adaptive}, for every $L \in \N$ and
+$s \in (0,1]$,
+\[
+  \Pr[G < L] \;\le\; s^{-L}\,\bigl(1-p(1-s)\bigr)^{T}.
+\]
+With $p = \tfrac18$ and $s = \tfrac12$:
+$\;\Pr[G < L] \le 2^{L}\,\bigl(\tfrac{15}{16}\bigr)^{T}$.
+\end{corollary}
+
+\begin{proof}
+On $\{G < L\}$ we have $s^G \ge s^L$ (as $s \le 1$), so
+$s^L \Pr[G < L] \le \E[s^G]$; apply Lemma~\ref{lem:adaptive} and Markov's
+reasoning directly (no measure theory needed: these are finite sums).
+\end{proof}
+
+\begin{remark}
+Lemma~\ref{lem:adaptive} replaces, in one induction, both the stochastic
+domination of adaptive trials by a binomial and the Chernoff bound for the
+binomial lower tail.  This is the main simplification that makes the growth
+phase formalization-friendly.
+\end{remark}
+
+\section{Growth phase}\label{sec:growth}
+
+\begin{definition}[Good rounds]\label{def:good}
+For $t < T$ let
+\[
+  X_t \;=\; \mathbf{1}\Bigl[\, m_{t+1} \ge \tfrac98\, m_t
+  \;\;\text{or}\;\; m_t > \tfrac n2 \,\Bigr] \in \{0,1\}.
+\]
+$X_t$ is a function of $(\omega_0,\dots,\omega_t)$.
+\end{definition}
+
+\begin{lemma}\label{lem:goodprob}
+For every $t$ and every prefix $(\omega_0,\dots,\omega_{t-1})$,
+$\Pr[X_t = 1 \mid \omega_0,\dots,\omega_{t-1}] \ge \tfrac18$.
+\end{lemma}
+
+\begin{proof}
+The prefix determines $I_t$.  If $m_t > n/2$, then $X_t = 1$ with conditional
+probability $1$.  Otherwise $1 \le m_t \le n/2$ (note $m_t \ge m_0 = 1$ by
+Lemma~\ref{lem:mono}), and since $\omega_t$ is uniform on $R_n$ and
+independent of the prefix, Lemma~\ref{lem:goodround} applies.
+\end{proof}
+
+\begin{lemma}[Enough good rounds force half-saturation]\label{lem:force}
+Let $L \in \N$ satisfy $(9/8)^L > n/2$.  If $\omega$ is such that
+$\sum_{t < T_1} X_t(\omega) \ge L$, then $m_{T_1}(\omega) > n/2$.
+\end{lemma}
+
+\begin{proof}
+Suppose $m_{T_1} \le n/2$.  By monotonicity (Lemma~\ref{lem:mono}),
+$m_t \le n/2$ for all $t \le T_1$.  Hence every good round $t < T_1$ satisfies
+$m_{t+1} \ge \tfrac98 m_t$, and every round satisfies $m_{t+1} \ge m_t$.  By
+induction on the number of good rounds, $m_{T_1} \ge (9/8)^{L} \, m_0 =
+(9/8)^L > n/2$, a contradiction.
+\end{proof}
+
+\begin{lemma}[Phase 1]\label{lem:phase1}
+With $T_1 = \ceil{117 \log n} + 23$,
+\[
+  \Pr\bigl[\, m_{T_1} \le \tfrac n2 \,\bigr] \;\le\; \frac1n .
+\]
+\end{lemma}
+
+\begin{proof}
+Set $L := \ceil{9 \log n} + 1$; since $\log\tfrac98 \ge \tfrac19$
+(Lemma~\ref{lem:logbounds}), we have
+$\log\bigl((9/8)^L\bigr) = L\log\tfrac98 \ge 9\log n \cdot \tfrac19 = \log n$,
+hence $(9/8)^L \ge n > n/2$.  By Lemma~\ref{lem:force}
+and Corollary~\ref{cor:tail} (with $p = 1/8$, $s = 1/2$, justified by
+Lemma~\ref{lem:goodprob}),
+\[
+  \Pr\bigl[m_{T_1} \le \tfrac n2\bigr]
+  \;\le\; \Pr\Bigl[\textstyle\sum_{t<T_1} X_t < L\Bigr]
+  \;\le\; 2^{L}\,\bigl(\tfrac{15}{16}\bigr)^{T_1}.
+\]
+It remains to check $2^L (15/16)^{T_1} \le 1/n$, equivalently
+\[
+  T_1 \log\tfrac{16}{15} \;\ge\; L \log 2 + \log n .
+\]
+Using $\log\frac{16}{15} \ge \tfrac1{16}$, $\log 2 < 0.6932$ and
+$L \le 9\log n + 2$:
+\[
+  L\log 2 + \log n \;\le\; (9 \log n + 2)\cdot 0.6932 + \log n
+  \;\le\; 7.239 \log n + 1.387 ,
+\]
+while
+\[
+  T_1 \log\tfrac{16}{15} \;\ge\; \frac{117\log n + 23}{16}
+  \;\ge\; 7.312 \log n + 1.437 . \qedhere
+\]
+\end{proof}
+
+\begin{remark}[On constants]\label{rem:constants}
+The clean statement to formalize is: \emph{for all $L, T_1$ with
+$(9/8)^L > n/2$ and $2^L (15/16)^{T_1} \le 1/n$, we have
+$\Pr[m_{T_1} \le n/2] \le 1/n$} --- the numerics above merely exhibit
+admissible values $L = \ceil{9\log n} + 1$, $T_1 = \ceil{117\log n} + 23$;
+any larger $T_1$ also works.
+\end{remark}
+
+\section{Saturation phase}\label{sec:saturation}
+
+\begin{lemma}[Phase 2]\label{lem:phase2}
+Let $A = \{m_{T_1} > n/2\} \subseteq \Omega$ (an event determined by the
+first $T_1$ coordinates).  Then for every $s \ge 0$,
+\[
+  \E\bigl[\, U_{T_1 + s}\, \mathbf{1}_A \,\bigr]
+  \;\le\; \Bigl(\frac23\Bigr)^{s}\, n .
+\]
+\end{lemma}
+
+\begin{proof}
+Induction on $s$.  For $s = 0$: $U_{T_1} \le n$ pointwise.  For the step,
+condition on the first $T_1 + s$ coordinates: on $A$ we have $m_{T_1+s} \ge
+m_{T_1} > n/2$ by monotonicity, so Lemma~\ref{lem:contract} applies to the
+(uniform, independent) round $\omega_{T_1+s}$ and gives, pointwise on each
+prefix in $A$,
+\[
+  \E\bigl[U_{T_1+s+1} \mid \omega_0,\dots,\omega_{T_1+s-1}\bigr]
+  \;\le\; \tfrac23\, U_{T_1+s} .
+\]
+Multiplying by $\mathbf{1}_A$ (a function of the prefix), taking outer
+expectations, and applying the induction hypothesis finishes the proof.
+\end{proof}
+
+\begin{corollary}\label{cor:phase2}
+With $T_2 = \ceil{6 \log n}$:
+$\;\Pr\bigl[\, U_T \ge 1 \text{ and } A \,\bigr] \le n\,(2/3)^{T_2} \le 1/n$.
+\end{corollary}
+
+\begin{proof}
+$U_T$ is $\N$-valued, so by Markov (Lemma~\ref{lem:markov}) applied to
+$U_T\mathbf{1}_A$ and Lemma~\ref{lem:phase2},
+$\Pr[U_T \mathbf{1}_A \ge 1] \le (2/3)^{T_2} n$.
+And $(2/3)^{T_2} n \le 1/n$ iff $T_2 \log\frac32 \ge 2\log n$, which holds
+since $\log\frac32 \ge \tfrac13$ (Lemma~\ref{lem:logbounds}) and
+$T_2 \ge 6\log n$.
+\end{proof}
+
+\section{Proof of Theorem~\ref{thm:main}}
+
+With $T_1 = \ceil{117\log n} + 23$, $T_2 = \ceil{6\log n}$, $T = T_1+T_2$:
+\[
+  \Pr[I_T \ne V] \;=\; \Pr[U_T \ge 1]
+  \;\le\; \Pr[\,\overline{A}\,] + \Pr[\,U_T \ge 1 \text{ and } A\,]
+  \;\le\; \frac1n + \frac1n
+\]
+by Lemma~\ref{lem:phase1} and Corollary~\ref{cor:phase2}. \qed
+
+\section{The Lean formalization}\label{sec:lean}
+
+The argument above is fully formalized in the accompanying repository
+(library \texttt{RumorSpread}, namespace \texttt{RumorPush}); the build
+contains no \texttt{sorry} and the main theorem depends only on the three
+standard axioms (\texttt{propext}, \texttt{Classical.choice},
+\texttt{Quot.sound}).  Design notes:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Probability space.} No measure theory, no PMF, no ENNReal.
+  \texttt{avg} is a finite sum divided by a cardinality, and
+  \texttt{expList $\alpha$ T F} — the expectation of a trajectory functional
+  $F$ over $T$ i.i.d.\ uniform draws — is defined \emph{by recursion on $T$}
+  (average out the first round, recurse).  ``Conditioning on the first
+  round'' is thereby a definitional unfolding, and Markov / union bounds are
+  pointwise inequalities pushed through monotonicity of \texttt{expList}.
+  The bridge theorem \texttt{expList\_eq\_avg\_ofFn}
+  (\texttt{Equivalence.lean}) proves this equals the uniform average over
+  the product space \texttt{Fin T $\to$ R n} of all round sequences, so the
+  model is the textbook one.
+\item \textbf{Process} (\texttt{Model.lean}): a round configuration is
+  \texttt{R n := $\forall$ v : Fin n, \{u // u $\ne$ v\}}; one round is
+  \texttt{step I r := I $\cup$ I.image (fun v => (r v).1)}; trajectories are
+  lists of rounds consumed by \texttt{run}.  Lemma~\ref{lem:force} is the
+  deterministic \texttt{pow\_goodCount\_mul\_card\_le\_card\_run}.
+\item \textbf{Lemma~\ref{lem:contact}} (\texttt{avg\_not\_contacted} in
+  \texttt{OneRound.lean}) is the only place where a probability is
+  \emph{computed} rather than estimated: a counting argument via an
+  explicit equivalence to a product of subtypes and
+  \texttt{Fintype.card\_pi}.
+\item \textbf{Concentration}: Lemma~\ref{lem:adaptive} becomes the
+  ten-line induction \texttt{expList\_half\_pow\_goodCount}
+  (\texttt{Growth.lean}); no Chernoff, no martingales, no couplings.
+\item \textbf{Analytic toolkit} (\texttt{Bounds.lean}):
+  \texttt{one\_add\_mul\_le\_pow} (Bernoulli) and short inductions for
+  Lemmas~\ref{lem:bonferroni} and~\ref{lem:upper}.  \texttt{Real.log}
+  enters only through the \emph{definition} of $L, T_1, T_2$ and the
+  numeric checks of Section~\ref{sec:growth}, via
+  Lemma~\ref{lem:logbounds} and Mathlib's
+  \texttt{Real.log\_two\_lt\_d9}; \texttt{Real.exp} appears only inside the
+  proof of \texttt{numeric\_A}.
+\item \textbf{File structure:}
+  \texttt{Bounds.lean} (Section~\ref{sec:ineq}),
+  \texttt{Prob.lean} (\texttt{avg}/\texttt{expList}),
+  \texttt{Model.lean} (Section~\ref{sec:model}),
+  \texttt{OneRound.lean} (Section~\ref{sec:oneround}),
+  \texttt{Growth.lean} (Sections~\ref{sec:adaptive}--\ref{sec:growth}),
+  \texttt{Saturation.lean} (Section~\ref{sec:saturation}),
+  \texttt{Main.lean} (main theorem
+  \texttt{push\_informs\_all\_whp}),
+  \texttt{Equivalence.lean} (faithfulness).
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{FG85} A.~Frieze, G.~Grimmett.
+\emph{The shortest-path problem for graphs with random arc-lengths}.
+Discrete Applied Mathematics 10 (1985) 57--77.
+\bibitem{Pittel87} B.~Pittel.
+\emph{On spreading a rumor}. SIAM J.\ Appl.\ Math.\ 47 (1987) 213--223.
+\bibitem{KSSV00} R.~Karp, C.~Schindelhauer, S.~Shenker, B.~V\"ocking.
+\emph{Randomized rumor spreading}. FOCS 2000.
+\end{thebibliography}
+
+\end{document}
