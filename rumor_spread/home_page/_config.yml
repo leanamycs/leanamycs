@@ -22,10 +22,10 @@ title: Rumor Spreading on the Complete Graph
 #email: your-email@example.com
 description: by Aakash Kumar, Maria Sofia Bucarelli, Emanuele Natale
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://aakash-verse.github.io/Rumor_Spreading_on_Kn" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://natema.github.io/Leanamycs" # not deployed from here yet (see rumor_spread-ci.yml); this is where it WOULD live if home_page/ becomes the Pages root
 twitter_username:
-github_username: Aakash-verse
-repository: Aakash-verse/Rumor_Spreading_on_Kn
+github_username: natema
+repository: natema/Leanamycs
 
 # Build settings
 remote_theme: pages-themes/cayman@v0.2.0 

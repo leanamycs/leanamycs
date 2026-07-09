@@ -14,7 +14,7 @@ main theorem is `RumorPush.push_informs_all_whp`.
 
 Useful links:
 
-* [Source repository](https://github.com/Aakash-verse/Rumor_Spreading_on_Kn)
+* [Source repository](https://github.com/natema/Leanamycs)
 * [Blueprint]({{ site.url }}/blueprint/)
 * [Blueprint as pdf]({{ site.url }}/blueprint.pdf)
 * [Dependency graph]({{ site.url }}/blueprint/dep_graph_document.html)

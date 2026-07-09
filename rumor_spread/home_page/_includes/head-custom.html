@@ -1,0 +1,17 @@
+<!-- Check if the current page requires MathJax support -->
+{% if page.usemathjax %}
+  <!-- MathJax v3 configuration: crucially, this is what makes MathJax treat
+       $...$ as inline math at all -- v2/v3 do NOT do this by default (to
+       avoid false positives on stray dollar signs in ordinary text). -->
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        tags: 'ams'
+      }
+    };
+  </script>
+  <script type="text/javascript" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+  </script>
+{% endif %}

@@ -17,10 +17,10 @@ exchange for a minimal analytic toolkit.
 A self-contained paper proof, written to mirror the formalization
 lemma-for-lemma, is in [latex/rumor_push.tex](latex/rumor_push.tex).
 
-**[Blueprint](https://aakash-verse.github.io/Rumor_Spreading_on_Kn/blueprint/)** ·
-**[Blueprint as pdf](https://aakash-verse.github.io/Rumor_Spreading_on_Kn/blueprint.pdf)** ·
-**[Dependency graph](https://aakash-verse.github.io/Rumor_Spreading_on_Kn/blueprint/dep_graph_document.html)** ·
-**[API docs](https://aakash-verse.github.io/Rumor_Spreading_on_Kn/docs/)**
+**[Blueprint](https://natema.github.io/Leanamycs/blueprint/)** ·
+**[Blueprint as pdf](https://natema.github.io/Leanamycs/blueprint.pdf)** ·
+**[Dependency graph](https://natema.github.io/Leanamycs/blueprint/dep_graph_document.html)** ·
+**[API docs](https://natema.github.io/Leanamycs/docs/)**
 
 The blueprint ([blueprint/src/content.tex](blueprint/src/content.tex)) states
 every lemma with a `\lean{}` tag pointing to its Lean declaration and a
@@ -66,15 +66,3 @@ lake build           # verifies every proof
 
 Toolchain: see [lean-toolchain](lean-toolchain). The main theorem depends only
 on the standard axioms (`propext`, `Classical.choice`, `Quot.sound`).
-
-## GitHub configuration
-
-To set up your new GitHub repository, follow these steps:
-
-* Under your repository name, click **Settings**.
-* In the **Actions** section of the sidebar, click "General".
-* Check the box **Allow GitHub Actions to create and approve pull requests**.
-* Click the **Pages** section of the settings sidebar.
-* In the **Source** dropdown menu, select "GitHub Actions".
-
-After following the steps above, you can remove this section from the README file.
