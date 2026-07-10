@@ -1,0 +1,31 @@
+% This file makes a web version of the blueprint
+% It should include all the \usepackage needed for this version.
+% The template includes standard AMS packages.
+% It is otherwise a very minimal preamble (you should probably at least
+% add cleveref and tikz-cd).
+
+\documentclass{article}
+
+\usepackage{amssymb, amsthm, amsmath}
+\usepackage{hyperref}
+\usepackage[showmore, dep_graph]{blueprint}
+
+
+\input{macros/common}
+\input{macros/web}
+
+% Relative, not absolute: the deployed site always has docs/ and blueprint/
+% as siblings under the same root (whether that root is the live Pages URL
+% or a local preview server), so relative links work in both places and
+% never 404 on an unpublished/renamed site.
+\home{..}
+\github{https://github.com/natema/Leanamycs}
+\dochome{../docs}
+
+\title{Rumor Spreading on the Complete Graph}
+\author{Aakash Kumar, Maria Sofia Bucarelli, Emanuele Natale}
+
+\begin{document}
+\maketitle
+\input{content}
+\end{document}

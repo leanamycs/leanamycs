@@ -1,0 +1,33 @@
+name: rumor_spread CI
+
+on:
+  push:
+    paths:
+      - 'rumor_spread/**'
+      - '.github/workflows/rumor_spread-ci.yml'
+  pull_request:
+    paths:
+      - 'rumor_spread/**'
+      - '.github/workflows/rumor_spread-ci.yml'
+  workflow_dispatch:
+
+# NOTE: this only runs `lake build` + lint, scoped to rumor_spread/ via
+# lake-package-directory. The blueprint/API-docs -> GitHub Pages deployment
+# (leanprover-community/docgen-action with blueprint: true) is deliberately
+# left out for now: this repo isn't ready to host a Pages site yet, and that
+# action assumes a repo-root layout (blueprint/, home_page/, `lake exe
+# checkdecls` all run relative to $GITHUB_WORKSPACE, not lake-package-directory)
+# so it needs revisiting once this becomes a multi-project monorepo anyway.
+# See rumor_spread/blueprint/ and rumor_spread/home_page/ for that source;
+# rumor_spread/.github/workflows/lean_action_ci.yml (not used here) is the
+# version with the full Pages deployment, kept for reference.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: leanprover/lean-action@434f25c2f80ded67bba02502ad3a86f25db50709 # 2025-07-02
+        with:
+          lake-package-directory: rumor_spread
