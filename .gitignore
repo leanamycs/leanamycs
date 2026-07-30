@@ -1,0 +1,19 @@
+# Jekyll build artifacts for the shared landing page in home_page/.
+# Gemfile.lock is intentionally not committed: CI resolves it via
+# ruby/setup-ruby's bundler cache against the current github-pages gem.
+/home_page/_site/
+/home_page/.jekyll-cache/
+/home_page/.bundle/
+/home_page/vendor/
+/home_page/Gemfile.lock
+/home_page/_config_local.yml
+
+# Where CI stages each project's built blueprint and API docs before the
+# Jekyll build, and where it drops them for Jekyll to pick up (see
+# .github/workflows/pages.yml). Both are generated, never committed.
+/site/
+/home_page/rumor_spread/
+/home_page/3-majority/
+
+# Each project has its own .gitignore for its Lake, blueprint and LaTeX
+# build artifacts.

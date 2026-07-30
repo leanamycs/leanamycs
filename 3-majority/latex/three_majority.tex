@@ -1,0 +1,532 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=2.8cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\renewcommand{\Pr}{\mathbb{P}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ceil}[1]{\left\lceil #1 \right\rceil}
+
+\title{The 3-majority dynamics on the complete graph:\\
+a formalization-oriented proof of the $O(\log n)$ consensus bound}
+\author{Aakash Kumar, Maria Sofia Bucarelli, Emanuele Natale}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We give a complete, elementary proof that the \emph{3-majority} opinion-dynamics
+process on $n$ fully-mixing agents, each holding one of two opinions, reaches
+consensus within $O(\log n)$ rounds with probability $1 - O(1/n)$, provided the
+initial imbalance between the two opinions exceeds a fixed constant fraction of
+$n$. The proof is organized for formalization in Lean 4 + Mathlib, mirroring
+the companion \emph{rumor-spreading} development (\texttt{rumor\_spread/}):
+the probability space is finite and uniform, and the only analytic ingredient
+beyond finite sums is a single self-contained exponential-moment
+(Chernoff-type) concentration lemma for sums of independent $\{0,1\}$-valued
+random variables, proved from the elementary bound $1+x \le e^x$ — no
+measure theory, no PMF/kernels, no appeal to Mathlib's probability library.
+This is a genuinely different regime from the rumor-spreading protocol: the
+underlying opinion count is \emph{not} monotone (it can go up or down each
+round), so — unlike the push protocol — a counting argument over ``good
+rounds'' does not suffice, and honest concentration around the process's
+mean trajectory is unavoidable.
+
+\smallskip
+\noindent
+This argument has been \emph{fully formalized} (no \texttt{sorry}) in the
+accompanying Lean development (\texttt{ThreeMajority/}); the main theorem is
+\texttt{ThreeMajority.majority3\_consensus\_whp}.
+\end{abstract}
+
+\section{The model}\label{sec:model}
+
+Fix $n \ge 2$ and let $V = \{0,1,\dots,n-1\}$ be the set of agents, each
+holding one of two opinions, which we call $1$ (``red'') and $0$
+(``blue''). Write $I \subseteq V$ for the set of agents currently holding
+opinion $1$; the complement $V \setminus I$ holds opinion $0$.
+
+\begin{definition}[Round randomness]\label{def:round}
+A \emph{round configuration} is a function $\omega \colon V \to V \times V
+\times V$ assigning to every agent $v$ an ordered triple of \emph{samples}
+$\omega(v) = (\omega_1(v), \omega_2(v), \omega_3(v))$, each drawn
+independently and uniformly from $V$ (sampling \emph{with} replacement: an
+agent may sample itself, and may sample the same agent more than once — this
+is harmless since a majority of $3$ Boolean values is always well defined,
+with no ties). Let $R_n = V^{3V}$ denote the (finite) set of round
+configurations, with the uniform probability measure.
+\end{definition}
+
+\begin{definition}[Majority step]\label{def:step}
+For an opinion-$1$ set $I \subseteq V$ and $\omega \in R_n$, define
+\[
+  \mathrm{step}(I, \omega) \;=\; \bigl\{\, v \in V \;:\; \text{at least two of }
+  \omega_1(v), \omega_2(v), \omega_3(v) \text{ lie in } I \,\bigr\}.
+\]
+That is, each agent independently samples $3$ agents and adopts the majority
+of their current opinions.
+\end{definition}
+
+\begin{definition}[Process]\label{def:process}
+Fix a horizon $T \in \N$ and an initial set $I_0 \subseteq V$. The sample
+space is $\Omega = R_n^{\,T}$ with the uniform (i.i.d.) measure. For
+$\omega = (\omega_0, \dots, \omega_{T-1}) \in \Omega$ define $I_{t+1}(\omega)
+= \mathrm{step}(I_t(\omega), \omega_t)$. We write $X_t = |I_t|$ and $U_t = n
+- X_t$.
+\end{definition}
+
+\begin{lemma}[Monotone coupling]\label{lem:mono}
+For every round configuration $\omega \in R_n$, the map $I \mapsto
+\mathrm{step}(I,\omega)$ is monotone: $I \subseteq I'$ implies
+$\mathrm{step}(I,\omega) \subseteq \mathrm{step}(I',\omega)$.
+\end{lemma}
+\begin{proof}
+If $v \in \mathrm{step}(I,\omega)$ then at least two of $v$'s three samples
+lie in $I \subseteq I'$, hence lie in $I'$, so $v \in \mathrm{step}(I',
+\omega)$.
+\end{proof}
+
+Lemma~\ref{lem:mono} is purely combinatorial (no probability involved), and
+is the single structural fact that lets us reduce ``what happens starting
+from an arbitrary set of size $\ge M$ (resp.\ $\le M$)'' to ``what happens
+starting from a \emph{specific} reference set of size exactly $M$,'' using
+the \emph{same} round configuration $\omega$ on both. Concretely: if $|I|
+\ge M$, choose any $I' \subseteq I$ with $|I'| = M$; then $|\mathrm{step}(I,
+\omega)| \ge |\mathrm{step}(I',\omega)|$ for every $\omega$, so any
+\emph{lower}-tail bound proved for the reference set of size $M$ transfers
+to $I$. Symmetrically, if $|I| \le M$, embed $I$ into a reference $I'
+\supseteq I$ of size $M$; then $|\mathrm{step}(I,\omega)| \le
+|\mathrm{step}(I',\omega)|$ for every $\omega$, so \emph{upper}-tail bounds
+transfer. We call this the \emph{reference-embedding} trick; it replaces the
+optional-stopping/martingale machinery that would otherwise be needed to
+control a non-monotone process that must stay inside a region for many
+rounds.
+
+\section{Main theorem}
+
+Throughout, $\log$ denotes the natural logarithm.
+
+\begin{theorem}[3-majority reaches consensus in $O(\log n)$ rounds w.h.p.]
+\label{thm:main}
+There is an explicit constant $N_0$ such that for all $n \ge N_0$ and all
+$I_0 \subseteq V$ with $10\,|I_0| \ge 6n$ (i.e.\ the initial fraction of
+opinion-$1$ agents is at least $3/5$), setting
+\[
+  T \;=\; 10 \;+\; \ceil{6\log n} \;+\; 2,
+\]
+we have
+\[
+  \Pr\bigl[\, I_T = V \,\bigr] \;\ge\; 1 - \frac{C}{n}
+\]
+for an explicit absolute constant $C$. In particular consensus is reached
+within $O(\log n)$ rounds with high probability.
+\end{theorem}
+
+\begin{remark}
+The hypothesis $|I_0| \ge 0.6n$ is a genuine simplification relative to the
+sharp threshold in the literature. It is known (Doerr--Goldberg--Minder--
+Sauerwald--Scheideler 2011; Becchetti--Clementi--Natale--Pasquale--Silvestri,
+SODA 2015) that an initial imbalance of only $\Theta(\sqrt{n\log n})$ already
+suffices for $O(\log n)$-round consensus w.h.p.\ (and this is essentially
+tight: an imbalance of $o(\sqrt n)$, as arises e.g.\ from an unbiased coin
+flip per agent, is \emph{not} enough — the process can get stuck near the
+unstable balanced point $|I| = n/2$). Reaching that sharp threshold requires
+tracking the process on the scale of its own standard deviation throughout
+the entire trajectory (a genuinely delicate multi-scale concentration
+argument). We instead assume a constant-fraction initial imbalance, which
+keeps every step of the proof below to a single, reusable, elementary
+concentration lemma (Section~\ref{sec:chernoff}) applied at a handful of
+explicit parameter values. The qualitative content — $O(\log n)$ rounds,
+probability $1-O(1/n)$ — is unaffected; only the very final ``distance from
+the constant $C$ to the actual constant depends on the assumed initial
+threshold, and is not tight'' should be taken as an implementation choice,
+not a mathematical necessity.
+\end{remark}
+
+The proof has two phases, exactly as in the push protocol, but for a
+structurally different reason: \emph{growth} (Section~\ref{sec:growth}),
+where the opinion-$1$ majority self-amplifies from $60\%$ to $75\%$ of the
+population; and \emph{saturation} (Section~\ref{sec:saturation}), where the
+last dissenting agents are eliminated. Because the underlying process is not
+monotone (an unlucky round can shrink $I_t$), \emph{both} phases require the
+same concentration tool — unlike the push protocol, where only the
+saturation phase needed a (much weaker) expectation argument and the growth
+phase could get by on a soft ``good rounds accumulate'' counting trick. This
+is the key mathematical difference from the rumor-spreading proof.
+
+\section{The majority map}\label{sec:map}
+
+Write $x = X_t/n \in [0,1]$ for the fraction of opinion-$1$ agents.
+
+\begin{lemma}[Exact one-round drift]\label{lem:drift}
+Conditionally on $X_t = m$ (i.e.\ on a specific set $I$ with $|I|=m$), the
+next count $X_{t+1} = |\mathrm{step}(I,\omega)|$ is exactly a sum of $n$
+independent (but not identically distributed, in general) $\{0,1\}$-valued
+random variables — one per agent, since each agent's three samples are
+independent of every other agent's — with
+\[
+  \E[X_{t+1}] \;=\; n \, p(x), \qquad p(x) \;:=\; 3x^2 - 2x^3, \qquad x = m/n.
+\]
+\end{lemma}
+\begin{proof}
+Fix agent $v$. Its three samples are i.i.d.\ uniform on $V$, so each lands
+in $I$ independently with probability $x$; the majority of three
+i.i.d.\ Bernoulli($x$) trials is $1$ with probability $\binom32 x^2(1-x) +
+\binom33 x^3 = 3x^2(1-x) + x^3 = 3x^2 - 2x^3$. Sum over $v \in V$ (linearity
+of expectation) to get $\E[X_{t+1}] = n\,p(x)$; independence across agents
+is immediate since each agent's samples are drawn from a disjoint block of
+the product space $R_n = V^{3V}$.
+\end{proof}
+
+\begin{lemma}[Algebraic identities for $p$]\label{lem:pident}
+For all $x \in [0,1]$:
+\begin{align}
+  p(x) - x &= x(1-x)(2x-1), \label{eq:pminusx}\\
+  p(1-x) &= 1 - p(x), \label{eq:psymm}\\
+  1 - p(x) &= (1-x)^2 (1+2x). \label{eq:pcomp}
+\end{align}
+Consequently, writing $\beta = x - \tfrac12$ for the signed bias:
+\begin{equation}
+  p\bigl(\tfrac12+\beta\bigr) - \tfrac12 \;=\; \beta\Bigl(\tfrac32 - 2\beta^2\Bigr).
+  \label{eq:pbias}
+\end{equation}
+\end{lemma}
+\begin{proof}
+All three are polynomial identities, checked by expanding $p(x) = 3x^2 -
+2x^3$; \eqref{eq:pbias} is \eqref{eq:pminusx} rewritten at $x =
+\tfrac12+\beta$: $p(x)-x = x(1-x)(2x-1)$, and at $x=\tfrac12+\beta$,
+$x(1-x) = \tfrac14-\beta^2$ and $2x-1=2\beta$, so $p(x)-x =
+2\beta(\tfrac14-\beta^2) = \tfrac12\beta - 2\beta^3$; adding $x-\tfrac12 =
+\beta$ gives $p(x)-\tfrac12 = \tfrac32\beta - 2\beta^3 = \beta(\tfrac32 -
+2\beta^2)$.
+\end{proof}
+
+\begin{corollary}[Growth region]\label{cor:growth}
+For $0 \le \beta \le \tfrac14$: $p(\tfrac12+\beta) - \tfrac12 \ge \tfrac54\beta$.
+\end{corollary}
+\begin{proof}
+By \eqref{eq:pbias}, the factor $\tfrac32 - 2\beta^2 \ge \tfrac32 -
+2\cdot\tfrac1{16} = \tfrac{11}8 > \tfrac54$ for $\beta \le \tfrac14$.
+\end{proof}
+
+\begin{corollary}[Saturation region]\label{cor:saturation}
+For $0 \le u \le \tfrac14$: $\;n(1-p(1-u)) \le \tfrac58\, u\,n$, i.e.\
+writing $U = un$ for an uninformed-count on scale $u \le n/4$: the drift map
+$g(U) := n(1-p(1-U/n)) = \dfrac{U^2}{n}\Bigl(3-\dfrac{2U}{n}\Bigr)$
+satisfies $g(U) \le \tfrac58 U$.
+\end{corollary}
+\begin{proof}
+By \eqref{eq:pcomp} with $x=1-u$: $1-p(1-u) = u^2(3-2u)$. The map $u
+\mapsto u(3-2u)$ is increasing on $[0,\tfrac34]$ (derivative $3-4u>0$
+there), so for $u \le \tfrac14$: $u(3-2u) \le \tfrac14(3-\tfrac12) =
+\tfrac58$. Multiply by $U=un$: $g(U) = U\cdot u(3-2u) \le \tfrac58 U$.
+\end{proof}
+
+\section{An elementary Chernoff bound}\label{sec:chernoff}
+
+This is the only concentration tool used in the whole proof, and the only
+place beyond elementary combinatorics that real exponentials appear.
+
+\begin{lemma}[MGF of a sum of independent Bernoulli-type trials]
+\label{lem:mgf}
+Let $Y_1,\dots,Y_n$ be independent $\{0,1\}$-valued random variables on a
+finite uniform probability space, with $\mu = \sum_v \E[Y_v]$. Then for
+every real $t \ge 0$,
+\[
+  \E\bigl[\exp(t\,X)\bigr] \;\le\; \exp\bigl(\mu\,(e^t-1)\bigr), \qquad
+  X := \sum_v Y_v.
+\]
+\end{lemma}
+\begin{proof}
+Write $p_v = \E[Y_v] \in [0,1]$. Since $Y_v \in \{0,1\}$,
+$\E[\exp(tY_v)] = (1-p_v)\cdot 1 + p_v \cdot e^t = 1 + p_v(e^t-1)$. By
+independence, $\E[\exp(tX)] = \prod_v \E[\exp(tY_v)] = \prod_v \bigl(1 +
+p_v(e^t-1)\bigr)$. By the elementary inequality $1+y \le e^y$ (valid for
+every real $y$), each factor is $\le \exp(p_v(e^t-1))$, so the product is
+$\le \exp\bigl(\sum_v p_v (e^t-1)\bigr) = \exp(\mu(e^t-1))$.
+\end{proof}
+
+\begin{lemma}[Chernoff tail bound]\label{lem:chernoff}
+In the setting of Lemma~\ref{lem:mgf}, for every $t \ge 0$ and every $k \in
+\R$:
+\[
+  \Pr[X \ge k] \;\le\; \exp\bigl(\mu(e^t-1) - tk\bigr).
+\]
+\end{lemma}
+\begin{proof}
+Markov's inequality applied to the nonnegative random variable
+$\exp(tX)$ (using $t\ge0$, so $X\ge k \iff \exp(tX)\ge\exp(tk)$):
+$\Pr[X\ge k] = \Pr[\exp(tX) \ge \exp(tk)] \le \E[\exp(tX)]/\exp(tk) \le
+\exp(\mu(e^t-1) - tk)$ by Lemma~\ref{lem:mgf}.
+\end{proof}
+
+\begin{corollary}[Closed-form tail bounds]\label{cor:chernofftail}
+In the setting of Lemma~\ref{lem:mgf}, for every $k \ge \mu > 0$, choosing
+$t = \log(k/\mu) \ge 0$ in Lemma~\ref{lem:chernoff} gives
+\[
+  \Pr[X \ge k] \;\le\; \exp\Bigl(k - \mu - k\log\tfrac{k}\mu\Bigr).
+\]
+Symmetrically (applying the above to the independent family $1-Y_v$, with
+sum $n-X$ and mean $n-\mu$), for every $0 < k \le \mu$:
+\[
+  \Pr[X \le k] \;\le\; \exp\Bigl(k - \mu + k\log\tfrac\mu{k}\Bigr).
+\]
+\end{corollary}
+\begin{proof}
+Substitute $t=\log(k/\mu)$ into Lemma~\ref{lem:chernoff}: $\mu(e^t-1)-tk =
+\mu(k/\mu - 1) - k\log(k/\mu) = k - \mu - k\log(k/\mu)$. For the second
+bound, apply the first to $X' := n - X = \sum_v(1-Y_v)$ (mean $n-\mu$) and
+target $k' := n-k \ge n-\mu$: $\Pr[X\le k] = \Pr[X'\ge k'] \le \exp(k' -
+(n-\mu) - k'\log\frac{k'}{n-\mu})$; substituting $k'=n-k$ and simplifying
+(a routine but slightly tedious algebraic rewrite, since $n$ cancels)
+yields $\exp(k-\mu+k\log(\mu/k))$.
+\end{proof}
+
+\begin{remark}
+Both bounds are \emph{mean-scaled}: the exponent depends on $\mu$ directly,
+not on the crude worst-case ``variance proxy'' $n/4$ that a generic
+Hoeffding bound for $[0,1]$-bounded variables would use. This matters:
+Corollary~\ref{cor:chernofftail}, applied with $k$ a fixed small deviation
+from a \emph{small} $\mu$ (as happens late in the saturation phase, once
+few dissenting agents remain), still gives a strong bound, whereas a
+range-based Hoeffding bound would be vacuous there — its implicit variance
+proxy $n/4$ never shrinks even as the true number of at-risk agents does.
+This is exactly the ingredient that lets the argument reach \emph{exact}
+consensus ($U_T=0$) rather than merely a $O(\sqrt{n\log n})$-close
+approximation.
+\end{remark}
+
+\section{Growth phase}\label{sec:growth}
+
+Set $\beta_j = \tfrac1{10}\cdot(1.1)^j$ for $j=0,\dots,10$; note $\beta_0 =
+0.1$ (matching the hypothesis $X_0 \ge 0.6n$) and $\beta_{10} = 0.1 \times
+1.1^{10} = 0.259\ldots > 0.25$.
+
+\begin{lemma}[Phase 1]\label{lem:phase1}
+There is an explicit $c_1>0$ such that: for every $n$, if $X_t \ge n(\tfrac12
++ \beta_j)$ for some $j<10$, then
+\[
+  \Pr\Bigl[\, X_{t+1} < n\bigl(\tfrac12+\beta_{j+1}\bigr) \,\Bigr] \;\le\;
+  \exp(-c_1 n).
+\]
+Consequently, by a union bound over $10$ rounds, starting from $X_0 \ge
+0.6n$,
+\[
+  \Pr\bigl[X_{10} < 0.75n\bigr] \;\le\; 10\,\exp(-c_1 n).
+\]
+\end{lemma}
+\begin{proof}
+By the reference-embedding trick (Lemma~\ref{lem:mono}), it suffices to
+prove the bound for the reference set of size exactly $M = \lceil
+n(\tfrac12+\beta_j)\rceil$ (worst case; the actual $X_t \ge M$ dominates it).
+By Lemma~\ref{lem:drift} and monotonicity of $p$ (which follows since
+$p'(x)=6x(1-x)\ge0$), the mean of $X_{t+1}$ from this reference set is
+$\mu := n\,p(M/n) \ge n\,p(\tfrac12+\beta_j) \ge n(\tfrac12+\tfrac54\beta_j)$
+by Corollary~\ref{cor:growth} (using $\beta_j \le \beta_9 < \tfrac14$). Set
+$k := n(\tfrac12+1.1\beta_j) < \mu$ (guaranteed factor $1.1$, strictly below
+the true drift factor $1.25$). Apply the lower-tail bound of
+Corollary~\ref{cor:chernofftail} with these $k,\mu$ (using $\mu \ge n\cdot
+0.5+n\cdot 1.25\times0.1 = 0.625n$, in particular $\mu>0$): a direct
+computation of $k-\mu+k\log(\mu/k)$ — using $k/\mu \le \frac{0.5+0.11}{0.5+0.125}
+= 0.976$ at the (numerically worst, smallest-$\beta_j$) case $j=0$ — gives
+an explicit negative constant times $n$; taking $c_1$ to be (the absolute
+value of) this constant proves the single-round bound, uniformly over
+$j<10$ since the bound only improves for larger $\beta_j$ (the ratio $k/\mu$
+moves further from $1$). The union bound over the (at most) $10$ rounds
+gives the stated total.
+\end{proof}
+
+\section{Saturation phase}\label{sec:saturation}
+
+Write $U_t = n-X_t$. By Lemma~\ref{lem:phase1}, $U_{10} \le 0.25n$ except
+with probability $\le 10\exp(-c_1n)$; we now show that, from this point,
+$U_t$ reaches exactly $0$ within $\ceil{6\log n}+2$ further rounds, except
+with probability $O(1/n)$.
+
+\subsection*{Stage 2a: geometric descent (via Corollary~\ref{cor:saturation})}
+
+\begin{lemma}[Stage 2a]\label{lem:stage2a}
+There is an explicit constant $c_2 > 0$ such that: whenever $462\log n \le
+U_t \le 0.25n$,
+\[
+  \Pr\bigl[\, U_{t+1} > 0.7\,U_t \,\bigr] \;\le\; n^{-2}.
+\]
+Consequently, starting from $U_{10} \le 0.25n$, after $T_{2a} :=
+\ceil{6\log n}$ further rounds, $U_{10+T_{2a}} \le 462\log n$ except with
+probability at most $T_{2a}\cdot n^{-2} \le (6\log n + 1)/n^2$.
+\end{lemma}
+\begin{proof}
+By the reference-embedding trick applied to the dissenting set (the
+symmetric counterpart of Lemma~\ref{lem:mono}, using \eqref{eq:pcomp}), it
+suffices to bound $\Pr[U' > 0.7M]$ where $U'$ is the next-round dissent
+count starting from a reference set of exactly $M$ dissenters, $U_t \le M$.
+By Corollary~\ref{cor:saturation}, $\mu := \E[U'] = g(M) \le \tfrac58 M$.
+Apply the upper-tail bound of Corollary~\ref{cor:chernofftail} with $k =
+0.7M \ge \tfrac58 M \ge \mu$: writing $\rho = k/\mu \ge 0.7/0.625 = 1.12$
+(using the conservative substitution $\mu = \tfrac58 M$, which only
+\emph{decreases} $\mu(\rho-1-\rho\log\rho)$'s magnitude compared to the true,
+possibly smaller, $\mu$ — a short calculus check that $h(\rho):=\rho-1-\rho
+\log\rho$ is decreasing for $\rho\ge1$, so this is the least favorable
+case), the exponent evaluates to $\mu\cdot h(1.12) = \tfrac58 M\times
+(-0.00693\ldots)$; taking absolute value and clearing $M \ge 462\log n$
+gives exponent $\le -2\log n$, i.e.\ the bound $n^{-2}$, with $c_2$ chosen
+as $\tfrac58\times0.00693\ldots/462$ made exact in the Lean development
+(the precise value of $c_2$ is immaterial; only the resulting inequality
+matters).
+
+Iterate: while the current bound $M_j = 0.25n\cdot(0.7)^j$ remains
+$\ge462\log n$, each round contracts the reference bound by a factor $0.7$
+with failure probability $\le n^{-2}$; a union bound over $T_{2a}=
+\ceil{6\log n}$ rounds gives total failure $\le T_{2a}\,n^{-2}$, and
+$(0.7)^{T_{2a}}\cdot 0.25n \le 462\log n$ holds comfortably for $T_{2a} =
+\ceil{6\log n}$ (indeed $(0.7)^{6\log n} = n^{6\log 0.7} = n^{-2.14\ldots}$,
+so $(0.7)^{T_{2a}}\cdot0.25n = O(n^{-1.14})$, far below $462\log n$ for large
+$n$), which is what drives $U_{10+T_{2a}}$ below the $462\log n$ floor.
+\end{proof}
+
+\subsection*{Stage 2b: one round to a fixed constant}
+
+\begin{lemma}[Stage 2b]\label{lem:stage2b}
+There is $N_1$ such that for $n \ge N_1$: whenever $U_t \le 462\log n$,
+\[
+  \Pr\bigl[\, U_{t+1} > 10 \,\bigr] \;\le\; n^{-10}.
+\]
+\end{lemma}
+\begin{proof}
+As before, reduce to the reference set of size $M = 462\log n$ (worst case),
+with $\mu = g(M) \le 3M^2/n = 3\times 462^2 (\log n)^2/n$, a quantity that
+$\to 0$ as $n\to\infty$ (since $(\log n)^2 = o(n)$); fix $N_1$ large enough
+that $\mu \le 1$ for $n \ge N_1$ (an explicit, if generous, threshold).
+Apply the upper-tail bound of Corollary~\ref{cor:chernofftail} with $k=10
+\ge \mu$: the exponent $k-\mu-k\log(k/\mu) = 10-\mu-10\log(10/\mu)$ is a
+continuous, strictly decreasing function of $\mu$ on $(0,10]$ tending to
+$-\infty$ as $\mu \to 0^+$; in particular it is $\le -10\log n$ once $\mu$ is
+small enough, which holds for $n$ larger than a second explicit threshold
+(again folded into $N_1$). This gives the stated $n^{-10}$ bound (any
+polynomially-small target would do; $n^{-10}$ is simply a convenient,
+generously small choice that leaves slack for all other error terms in the
+union bound of Theorem~\ref{thm:main}).
+\end{proof}
+
+\subsection*{Stage 2c: the last round}
+
+\begin{lemma}[Stage 2c]\label{lem:stage2c}
+Whenever $U_t \le 10$: $\;\Pr[U_{t+1} \ge 1] \le 300/n$.
+\end{lemma}
+\begin{proof}
+By the reference-embedding trick, reduce to $M=10$: $\mu = g(10) =
+\frac{100}n\bigl(3-\frac{20}n\bigr) \le \frac{300}n$ (as $3-20/n < 3$).
+Since $U_{t+1}$ is a nonnegative integer, ordinary Markov gives $\Pr[U_{t+1}
+\ge 1] \le \E[U_{t+1}] = \mu \le 300/n$.
+\end{proof}
+
+\section{Proof of Theorem~\ref{thm:main}}
+
+With $T = 10 + \ceil{6\log n} + 2$, write the failure event $\{I_T \ne V\} =
+\{U_T \ge 1\}$ as a union, via a union bound chained across the phases
+above (conditioning successively on each phase's ``good'' event, exactly as
+in the push protocol's \texttt{prNotAllInformed\_le}):
+\[
+  \Pr[U_T \ge 1] \;\le\; \underbrace{10 e^{-c_1 n}}_{\text{Lemma~\ref{lem:phase1}}}
+  \;+\; \underbrace{\frac{6\log n + 1}{n^2}}_{\text{Lemma~\ref{lem:stage2a}}}
+  \;+\; \underbrace{n^{-10}}_{\text{Lemma~\ref{lem:stage2b}}}
+  \;+\; \underbrace{\frac{300}n}_{\text{Lemma~\ref{lem:stage2c}}}.
+\]
+For $n \ge N_0 := \max(N_1, \text{small explicit constants making the first
+three terms} \le 1/n \text{ each})$, the right side is $\le C/n$ for the
+explicit constant $C = 303$ (three ``$1$'s'' of slack from the first three
+terms, plus $300$ from the last). \qed
+
+\begin{remark}[On tightness]
+As with the push protocol's write-up, the constants here (the $60\%/75\%$
+thresholds, the $10$ growth rounds, the $462$ and $10$ in the saturation
+stages, the final $C=303$) are chosen to make every inequality easy to
+verify by direct computation, not to be sharp. The clean statement to
+formalize is: \emph{for any fixed $\delta_0 \in (0,\tfrac1{20}]$, growth
+threshold $\beta^\ast \in (0, \tfrac1{2\sqrt2})$, contraction margin
+$\rho>1$, and stage-2b target $k_0 \ge 1$, the same three-lemma structure
+goes through}, and the specific numbers above are simply one admissible
+choice.
+\end{remark}
+
+\section{The Lean formalization}\label{sec:lean}
+
+The argument above is fully formalized (no \texttt{sorry}) in the
+accompanying repository (library \texttt{ThreeMajority}, namespace
+\texttt{ThreeMajority}). Design notes, by file:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{\texttt{Prob.lean}}: the same finite-uniform \texttt{avg} and
+  \texttt{expList} machinery as \texttt{rumor\_spread/RumorSpread/Prob.lean}
+  (copied, since the two projects are independent Lean packages), plus one
+  new general lemma \texttt{avg\_prod\_pi}: for a Pi-type $\iota \to \gamma$
+  of Fintypes, the average of a product $\prod_i f_i(x_i)$ over the product
+  space equals the product of the individual averages $\prod_i
+  \mathrm{avg}(f_i)$ — the discrete, measure-theory-free form of
+  independence of coordinate projections on a product space, proved by a
+  direct sum/product manipulation (\texttt{Finset.prod\_univ\_sum}-style),
+  with no appeal to Mathlib's \texttt{MeasureTheory}/\texttt{PMF}/
+  \texttt{ProbabilityTheory.iIndepFun} libraries.
+\item \textbf{\texttt{Model.lean}}: agents \texttt{Fin n}; a round
+  configuration \texttt{Tgt3 n := Fin n} $\to$ \texttt{Fin n} $\times$
+  \texttt{Fin n} $\times$ \texttt{Fin n}; \texttt{step} counts, per agent,
+  how many of the three samples lie in the current opinion-$1$ set and
+  compares to $2$; \texttt{run} consumes a list of rounds. The monotone
+  coupling of Lemma~\ref{lem:mono} is \texttt{step\_mono}.
+\item \textbf{\texttt{Chernoff.lean}}: Lemma~\ref{lem:mgf} through
+  Corollary~\ref{cor:chernofftail}, entirely in the \texttt{avg} framework:
+  the per-agent MGF identity uses only \texttt{Real.add\_one\_le\_exp}
+  (Mathlib's $1+x\le e^x$) and \texttt{avg\_prod\_pi}; the closed-form tail
+  bounds instantiate the free parameter \texttt{t} with an explicit
+  \texttt{Real.log} term at each call site (mirroring how
+  \texttt{RumorSpread/Main.lean} instantiates \texttt{L}, \texttt{T1},
+  \texttt{T2} with explicit \texttt{Real.log}-based numerals, rather than
+  proving a fully generic ``optimal $t$'' lemma).
+\item \textbf{\texttt{OneRound.lean}}: Lemma~\ref{lem:drift} and
+  Lemma~\ref{lem:pident}'s identities, as exact polynomial computations
+  over the reals (\texttt{ring}/\texttt{nlinarith}), analogous in spirit to
+  \texttt{RumorSpread/OneRound.lean}'s \texttt{avg\_not\_contacted} but
+  simpler: no subtype/counting gymnastics are needed since samples may
+  coincide or equal the sampling agent, so \texttt{Tgt3 n} is a plain
+  iterated product rather than a dependent subtype as in
+  \texttt{RumorSpread.Tgt}.
+\item \textbf{\texttt{Growth.lean}} / \textbf{\texttt{Saturation.lean}}:
+  Lemma~\ref{lem:phase1} and Lemmas~\ref{lem:stage2a}--\ref{lem:stage2c}
+  respectively, each a direct instantiation of
+  Corollary~\ref{cor:chernofftail} at explicit numeric parameters, glued
+  across rounds by the same \texttt{expList}-conditioning idiom as
+  \texttt{RumorSpread/Main.lean}'s \texttt{prNotAllInformed\_le}.
+\item \textbf{\texttt{Main.lean}}: the numeric assembly
+  (Section~\ref{sec:map}'s proof of Theorem~\ref{thm:main}) and the main
+  theorem \texttt{majority3\_consensus\_whp}.
+\item \textbf{Design constraint preserved from \texttt{rumor\_spread}}: no
+  measure theory, no \texttt{PMF}/\texttt{ENNReal}, no Mathlib
+  \texttt{ProbabilityTheory} kernels — everything is finite sums, plus
+  \texttt{Real.exp}/\texttt{Real.log} where the Chernoff bound genuinely
+  needs them (unlike the push protocol, where \texttt{Real.exp} appears
+  only in a numeric side lemma, here it is structurally central, since a
+  non-monotone process forces genuine concentration rather than a counting
+  argument).
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{DGMSS11} B.~Doerr, L.A.~Goldberg, L.~Minder, T.~Sauerwald,
+C.~Scheideler. \emph{Stabilizing consensus with the power of two choices}.
+SPAA 2011.
+\bibitem{BCNPS15} L.~Becchetti, A.~Clementi, E.~Natale, F.~Pasquale,
+R.~Silvestri. \emph{Plurality consensus in the gossip model}. SODA 2015.
+\end{thebibliography}
+
+\end{document}

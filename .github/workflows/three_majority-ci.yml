@@ -1,17 +1,17 @@
-name: rumor_spread CI
+name: 3-majority CI
 
 on:
   push:
     paths:
-      - 'rumor_spread/**'
-      - '.github/workflows/rumor_spread-ci.yml'
+      - '3-majority/**'
+      - '.github/workflows/three_majority-ci.yml'
   pull_request:
     paths:
-      - 'rumor_spread/**'
-      - '.github/workflows/rumor_spread-ci.yml'
+      - '3-majority/**'
+      - '.github/workflows/three_majority-ci.yml'
   workflow_dispatch:
 
-# NOTE: this only runs `lake build` + lint, scoped to rumor_spread/ via
+# NOTE: this only runs `lake build` + lint, scoped to 3-majority/ via
 # lake-package-directory. The blueprint, the API docs and their deployment to
 # GitHub Pages are handled for every project at once by
 # .github/workflows/pages.yml.
@@ -24,4 +24,4 @@ jobs:
       - uses: actions/checkout@v5
       - uses: leanprover/lean-action@434f25c2f80ded67bba02502ad3a86f25db50709 # 2025-07-02
         with:
-          lake-package-directory: rumor_spread
+          lake-package-directory: 3-majority
