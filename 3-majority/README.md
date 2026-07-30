@@ -66,7 +66,7 @@ that a Chernoff bound *is* needed here, and so is proved from scratch:
   past `3/4` except with probability `≤ 10 exp(-c₁n)`.
 - **Saturation phase** ([Saturation.lean](ThreeMajority/Saturation.lean)):
   the dissent count contracts by `5/8` per round, in three stages —
-  geometric descent to a `Θ(log n)` floor over `⌈6 log n⌉ rounds`, one
+  geometric descent to a `Θ(log n)` floor over `⌈6 log n⌉` rounds, one
   round from that floor to a fixed constant `10`, and one final Markov step
   to exactly `0`.
 - **Elementary inequalities** ([Bounds.lean](ThreeMajority/Bounds.lean)):

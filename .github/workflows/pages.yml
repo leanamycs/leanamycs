@@ -243,6 +243,30 @@ jobs:
         # Also copies the blueprints and API docs collected above into _site.
         run: JEKYLL_ENV=production bundle exec jekyll build
 
+      - name: Check every project made it into the assembled site
+        # Jekyll copies the collected directories across as static files rather
+        # than reporting on them, so a project silently missing from the site
+        # would otherwise show up only as 404s after deployment.
+        working-directory: home_page
+        run: |
+          set -uo pipefail
+          status=0
+          check() {
+            if [ -e "$1" ]; then echo "ok       $1"; else echo "MISSING  $1"; status=1; fi
+          }
+          for p in rumor_spread 3-majority; do
+            check "_site/$p/blueprint/index.html"
+            check "_site/$p/blueprint/dep_graph_document.html"
+            check "_site/$p/blueprint.pdf"
+            # The API docs are deliberately skipped on pull requests.
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              check "_site/$p/docs/index.html"
+              check "_site/$p/docs/find/index.html"
+            fi
+          done
+          du -sh _site
+          exit $status
+
       - name: Upload the assembled site
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
