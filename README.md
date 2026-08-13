@@ -5,7 +5,7 @@ related distributed processes. Each project is paired with a
 [leanblueprint](https://github.com/PatrickMassot/leanblueprint) connecting the
 paper proof to the Lean code statement-by-statement.
 
-**[natema.github.io/Leanamycs](https://natema.github.io/Leanamycs/)** — landing
+**[leanamycs.github.io/leanamycs/](leanamycs.github.io/leanamycs/)** — landing
 page, blueprints, dependency graphs and API docs for everything below.
 
 | Project | Result | Main theorem |
