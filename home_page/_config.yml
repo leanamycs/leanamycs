@@ -25,8 +25,8 @@ description: Lean 4 formalizations of opinion dynamics and related distributed p
 # Cayman layout builds asset URLs as `site.github.repository_name | ... |
 # relative_url` under JEKYLL_ENV=production, which already supplies the
 # repository-name prefix. Setting baseurl here too would double it.
-baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://leanamycs.github.io/leanamycs"
+baseurl: "/leanamycs"
+url: "https://leanamycs.github.io"
 twitter_username:
 github_username: leanamycs
 repository: leanamycs/Leanamycs
