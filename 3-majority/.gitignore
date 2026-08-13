@@ -9,7 +9,7 @@
 # Local-only scratch files (not part of the committed doc build)
 /docbuild/
 
-# latexmk build byproducts for latex/rumor_push.tex (rumor_push.pdf IS committed)
+# latexmk build byproducts for latex/three_majority.tex (three_majority.pdf IS committed)
 /latex/*.aux
 /latex/*.fdb_latexmk
 /latex/*.fls

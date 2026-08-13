@@ -1,0 +1,631 @@
+% Content of the blueprint for the 3-majority opinion-dynamics formalization.
+% Mirrors latex/three_majority.tex in spirit, but every statement here also
+% carries \lean{...} / \leanok / \uses{...} tags matched to the *actual*
+% Lean declarations in ThreeMajority/*.lean (namespace `ThreeMajority`), so
+% that leanblueprint can build the dependency graph and check coverage.
+% Where the Lean proof takes a different route than the paper draft in
+% latex/three_majority.tex, this file follows the Lean proof.
+
+\begin{abstract}
+\noindent
+We give a complete, elementary proof that the \emph{3-majority}
+opinion-dynamics process on $n$ fully-mixing agents, each holding one of two
+opinions, reaches consensus within $O(\log n)$ rounds with probability
+$1-O(1/n)$, provided the initial imbalance between the two opinions exceeds
+a fixed constant fraction of $n$ (at least $60\%$ vs.\ $40\%$). The
+probability space is finite and uniform throughout; the only analytic
+ingredient beyond finite sums is a single self-contained exponential-moment
+(Chernoff-type) concentration lemma for sums of independent
+$\{0,1\}$-valued random variables, proved from the elementary bound
+$1+x \le e^x$ --- no measure theory, no PMF/kernels, no appeal to Mathlib's
+probability library. This is a genuinely different regime from the
+companion \texttt{rumor\_spread} (push protocol) development: the
+opinion-$1$ count is \emph{not} monotone in the round index (an unlucky
+round can shrink it), so a counting argument over ``good rounds'' does not
+suffice --- honest concentration around the process's mean trajectory is
+needed in \emph{both} the growth and saturation phases. This argument has
+been \emph{fully formalized} (no \texttt{sorry}) in Lean~4 + Mathlib; the
+main theorem is \texttt{ThreeMajority.majority3\_consensus\_whp}.
+\end{abstract}
+
+\section{The model}\label{sec:model}
+
+Fix $n \ge 1$ and let $V = \{0,1,\dots,n-1\}$ be the set of agents, each
+holding one of two opinions, $1$ (``red'') or $0$ (``blue''). Write
+$I \subseteq V$ for the set of agents currently holding opinion $1$.
+
+\begin{definition}[Round randomness]\label{def:round}
+  \lean{ThreeMajority.Tgt3}
+  \leanok
+  A \emph{round configuration} is a function $r \colon V \to V \times V
+  \times V$ assigning to every agent $v$ an ordered triple of \emph{samples},
+  each drawn independently and uniformly from $V$, \emph{with} replacement
+  (an agent may sample itself, or the same agent twice --- harmless, since a
+  majority of three Boolean values is always well defined). Let
+  $R_n = V^{3V}$ denote the (finite) set of round configurations, with the
+  uniform probability measure.
+\end{definition}
+
+\begin{definition}[Majority step]\label{def:step}
+  \lean{ThreeMajority.step, ThreeMajority.sampleCount, ThreeMajority.sampleCountOf, ThreeMajority.mem_step}
+  \leanok
+  \uses{def:round}
+  For an opinion-$1$ set $I \subseteq V$ and $r \in R_n$,
+  \[
+    \mathrm{step}(I,r) \;=\; \{\, v \in V : \text{at least two of } r(v)\text{'s three
+    coordinates lie in } I \,\}.
+  \]
+  Each agent independently samples $3$ agents and adopts the majority of
+  their current opinions.
+\end{definition}
+
+\begin{definition}[Process]\label{def:process}
+  \lean{ThreeMajority.run}
+  \leanok
+  \uses{def:step}
+  Fix a horizon $T \in \N$ and an initial set $I_0 \subseteq V$. The sample
+  space is $\Omega = R_n^{\,T}$ with the uniform (i.i.d.) measure. For
+  $r = (r_0,\dots,r_{T-1}) \in \Omega$ define $I_{t+1} =
+  \mathrm{step}(I_t, r_t)$. We write $X_t = |I_t|$ and $U_t = n - X_t$. In
+  the formalization, a trajectory is a \texttt{List} of round configurations
+  and $\mathrm{run}\ I\ l$ folds \texttt{step} over the list $l$.
+\end{definition}
+
+\begin{lemma}[Monotone coupling]\label{lem:mono}
+  \lean{ThreeMajority.step_mono, ThreeMajority.run_mono, ThreeMajority.sampleCount_mono}
+  \leanok
+  \uses{def:step, def:process}
+  For a \emph{fixed} round $r$, the map $I \mapsto \mathrm{step}(I,r)$ is
+  monotone: $I \subseteq I'$ implies $\mathrm{step}(I,r) \subseteq
+  \mathrm{step}(I',r)$; iterating over a trajectory, $\mathrm{run}$ is
+  monotone in the same sense. This is purely combinatorial (no probability
+  involved).
+\end{lemma}
+
+\begin{remark}
+  Unlike the push protocol, where the analogous monotonicity
+  (Lemma~\ref{lem:mono} there) is load-bearing throughout, here the
+  per-round probabilistic estimates below (Lemmas~\ref{lem:growthround},
+  \ref{lem:satclosed}, etc.) are instead stated and proved directly for
+  \emph{any} set $I$ satisfying a hypothesis on $|I|$, using monotonicity of
+  the real polynomial $p$ of Section~\ref{sec:map} on $[0,1]$ rather than a
+  reference-embedding argument via Lemma~\ref{lem:mono}. Lemma~\ref{lem:mono}
+  is recorded because it is the exact analogue of the push protocol's
+  structural fact, but it is not otherwise used by the chain of lemmas
+  leading to the main theorem.
+\end{remark}
+
+\section{Main theorem}\label{sec:main-statement}
+
+Throughout, $\log$ denotes the natural logarithm.
+
+\begin{theorem}[3-majority reaches consensus in $O(\log n)$ rounds w.h.p.]
+  \label{thm:main}
+  \lean{ThreeMajority.majority3_consensus_whp}
+  \leanok
+  \uses{lem:mainfailclean}
+  Let $n$ be such that $\log n \ge 30$ (in particular $n \ge 2$), let
+  $I_0 \subseteq V$ with $|I_0| \ge \tfrac35 n$, and set
+  \[
+    T \;=\; 10 + (T_{2a}(n) + 2), \qquad T_{2a}(n) = \ceil{6\log n}.
+  \]
+  Then $\Pr[\, I_T = V \,] \;\ge\; 1 - \dfrac{500}{n}$.
+\end{theorem}
+
+\begin{remark}
+  As in the push protocol's write-up, the threshold $\log n \ge 30$ and
+  the constant $500$ are deliberately crude: the proof is organized to keep
+  every inequality an easy direct computation, not to be sharp. Reaching
+  this modest, two-digit threshold on $\log n$ (rather than an
+  astronomically large one) relies on two ingredients in
+  Section~\ref{sec:ineq}: a degree-$11$ instance of the generic
+  exponential-vs-power bound (Lemma~\ref{lem:exppow}), and a log-log bound
+  tangent at a reference point near the threshold itself rather than at the
+  fixed point $e$ (Lemma~\ref{lem:loglog}). It is known
+  (Doerr--Goldberg--Minder--Sauerwald--Scheideler 2011;
+  Becchetti--Clementi--Natale--Pasquale--Silvestri, SODA 2015) that an
+  initial imbalance of only $\Theta(\sqrt{n\log n})$ already suffices for
+  $O(\log n)$-round consensus w.h.p.; reaching that sharp threshold
+  requires tracking the process on the scale of its own standard deviation
+  throughout, a substantially more delicate multi-scale argument. Here a
+  constant-fraction initial imbalance keeps every step to a single,
+  reusable Chernoff bound (Section~\ref{sec:chernoff}) applied at a handful
+  of explicit parameters.
+\end{remark}
+
+The proof has two phases, as in the push protocol, but for a structurally
+different reason: \textbf{growth} (Section~\ref{sec:growth}), where the
+opinion-$1$ fraction self-amplifies from $60\%$ to $75\%$; and
+\textbf{saturation} (Section~\ref{sec:saturation}), where the last
+dissenting agents are eliminated in three stages. Because the process is
+not monotone in the round index, \emph{both} phases need the Chernoff bound
+of Section~\ref{sec:chernoff} --- unlike the push protocol, where only
+saturation needed a (much weaker) expectation argument.
+
+\section{Finite uniform probability and independence}\label{sec:prelim}
+
+As in the push protocol, all randomness is uniform over finite types, so
+instead of measure theory or \texttt{PMF} we work with plain finite sums.
+
+\begin{definition}[Average]\label{def:avg}
+  \lean{ThreeMajority.avg}
+  \leanok
+  For a finite type $\alpha$ and $f \colon \alpha \to \R$,
+  $\mathrm{avg}(f) := \bigl(\sum_a f(a)\bigr)/|\alpha|$ is the expectation of
+  $f$ under the uniform distribution on $\alpha$.
+\end{definition}
+
+\begin{definition}[Trajectory expectation]\label{def:expList}
+  \lean{ThreeMajority.expList}
+  \leanok
+  \uses{def:avg}
+  Exactly as in the push protocol: $\mathrm{expList}\ \alpha\ T\ F$ is the
+  expectation of a functional $F$ of a trajectory of $T$ i.i.d.\ uniform
+  draws from $\alpha$, defined by recursion on $T$ (the head draw is
+  averaged out first), so conditioning on the first round is a definitional
+  unfolding.
+\end{definition}
+
+\begin{lemma}[Basic properties]\label{lem:avg-basic}
+  \lean{ThreeMajority.avg_nonneg, ThreeMajority.avg_le_avg, ThreeMajority.avg_add,
+    ThreeMajority.avg_sub, ThreeMajority.avg_const_mul, ThreeMajority.avg_sum,
+    ThreeMajority.avg_indicator, ThreeMajority.avg_const,
+    ThreeMajority.expList_nonneg, ThreeMajority.expList_le_expList,
+    ThreeMajority.expList_add, ThreeMajority.expList_const_mul,
+    ThreeMajority.expList_const, ThreeMajority.expList_append}
+  \leanok
+  \uses{def:avg, def:expList}
+  $\mathrm{avg}$ and $\mathrm{expList}$ are monotone, additive, homogeneous,
+  and constants pass through unchanged; $\mathrm{expList}$ over a
+  concatenated horizon splits as a nested $\mathrm{expList}$
+  (\texttt{expList\_append}), used to glue phases in
+  Section~\ref{sec:proof-main}.
+\end{lemma}
+
+\begin{lemma}[Independence over a product space]\label{lem:indep}
+  \lean{ThreeMajority.avg_mul_prod, ThreeMajority.avg_fst_mul, ThreeMajority.avg_snd_mul,
+    ThreeMajority.avg_equiv, ThreeMajority.avg_prod_pi, ThreeMajority.avg_eval}
+  \leanok
+  \uses{def:avg}
+  \textbf{New relative to the push protocol}, since that development only
+  ever averaged over a single uniform draw at a time. For finite types
+  $\beta,\delta$ and $g \colon \beta\to\R$, $h\colon\delta\to\R$:
+  $\mathrm{avg}(p \mapsto g(p_1)h(p_2)) = \mathrm{avg}(g)\,\mathrm{avg}(h)$
+  over the product $\beta\times\delta$ (\texttt{avg\_mul\_prod}), with
+  marginal consequences \texttt{avg\_fst\_mul}/\texttt{avg\_snd\_mul}.
+  Iterating over a $\mathrm{Fin}\ n$-indexed product
+  (\texttt{avg\_prod\_pi}): for $f \colon \mathrm{Fin}\ n \to \gamma \to \R$,
+  \[
+    \mathrm{avg}\Bigl(x \mapsto \textstyle\prod_i f_i(x_i)\Bigr)
+      \;=\; \prod_i \mathrm{avg}(f_i)
+  \]
+  over $x \colon \mathrm{Fin}\ n \to \gamma$ --- the discrete,
+  measure-theory-free form of ``coordinate projections on a product space
+  are independent,'' with a one-coordinate marginal corollary
+  (\texttt{avg\_eval}). This is exactly the independence fact that lets the
+  $n$ agents' per-round updates be combined into a single concentration
+  bound (Section~\ref{sec:chernoff}).
+\end{lemma}
+
+\section{The majority map}\label{sec:map}
+
+Write $x = X_t/n \in [0,1]$ for the opinion-$1$ fraction, and
+$\mathrm{ind}(I)$ for the real-valued membership indicator of $I$, so
+$\mathrm{avg}(\mathrm{ind}(I)) = |I|/n$.
+
+\begin{lemma}[Majority-of-three as a polynomial]\label{lem:majpoly}
+  \lean{ThreeMajority.ind, ThreeMajority.avg_ind, ThreeMajority.avg_ind_eq,
+    ThreeMajority.majorityIndicator_eq}
+  \leanok
+  \uses{def:avg, def:step}
+  For $a,b,c \in \{0,1\}$: $\mathbf 1[a+b+c\ge2] = ab+bc+ac-2abc$. Applied
+  pointwise to the three samples of a fixed agent, this expresses the
+  majority indicator as a polynomial in the three membership indicators.
+\end{lemma}
+
+\begin{definition}[Per-agent contribution]\label{def:Ymaj}
+  \lean{ThreeMajority.Y_maj, ThreeMajority.Y_maj_zero_one, ThreeMajority.card_step_eq_sum}
+  \leanok
+  \uses{lem:majpoly}
+  $Y_{\mathrm{maj}}(I,v,s) \in \{0,1\}$ is $1$ iff a majority of the sample
+  triple $s$ lies in $I$ (independent of $v$, kept as a function of $v$ to
+  match the shape the Chernoff bound of Section~\ref{sec:chernoff} expects).
+  Then $|\mathrm{step}(I,r)| = \sum_v Y_{\mathrm{maj}}(I,v,r(v))$
+  (\texttt{card\_step\_eq\_sum}): the per-agent, $\{0,1\}$-valued
+  decomposition that Section~\ref{sec:chernoff}'s tail bounds need.
+\end{definition}
+
+\begin{lemma}[Exact one-round drift]\label{lem:drift}
+  \lean{ThreeMajority.avg_ind_mul_fst_snd1, ThreeMajority.avg_ind_mul_snd1_snd2,
+    ThreeMajority.avg_ind_mul_fst_snd2, ThreeMajority.avg_ind_mul_triple,
+    ThreeMajority.avg_Y_maj_eq, ThreeMajority.sum_avg_Y_maj, ThreeMajority.avg_card_step}
+  \leanok
+  \uses{def:Ymaj, lem:indep}
+  Conditionally on a fixed $I$ with $|I|=m$, the next count
+  $X_{t+1} = |\mathrm{step}(I,r)|$ satisfies
+  \[
+    \E_r[X_{t+1}] \;=\; n\,p(x), \qquad p(x) := 3x^2-2x^3, \qquad x = m/n,
+  \]
+  proved exactly (no approximation) via Lemma~\ref{lem:majpoly},
+  Definition~\ref{def:Ymaj} and the independence toolkit of
+  Lemma~\ref{lem:indep} (each pairwise/triple product of membership
+  indicators over distinct coordinates of the product space
+  $\mathrm{Tgt3}\ n$ factors by \texttt{avg\_mul\_prod}).
+\end{lemma}
+
+\begin{definition}[Dissent contribution]\label{def:Ydis}
+  \lean{ThreeMajority.Y_dis, ThreeMajority.Y_dis_zero_one, ThreeMajority.card_dissent_eq_sum,
+    ThreeMajority.sum_avg_Y_dis}
+  \leanok
+  \uses{def:Ymaj, lem:drift}
+  $Y_{\mathrm{dis}} := 1 - Y_{\mathrm{maj}}$, the complementary per-agent
+  dissent contribution, so $n - |\mathrm{step}(I,r)| = \sum_v
+  Y_{\mathrm{dis}}(I,v,r(v))$ with mean $n - n\,p(x)$
+  (\texttt{sum\_avg\_Y\_dis}); by the algebraic identity
+  $1-p(x) = (1-x)^2(1+2x)$ this is the quantity controlled in
+  Section~\ref{sec:saturation}.
+\end{definition}
+
+\begin{remark}
+  The algebraic identities for $p$ used throughout below --- $p(x)-x =
+  x(1-x)(2x-1)$, $1-p(x) = (1-x)^2(1+2x)$, and the growth/saturation
+  regional bounds $p(\tfrac12+\beta)-\tfrac12 \ge \tfrac54\beta$ for
+  $0\le\beta\le\tfrac14$ and $u(3-2u)\le\tfrac58$ for $0\le u\le\tfrac14$ ---
+  are not isolated as separate Lean lemmas: each use site
+  (\texttt{growth\_round}, \texttt{saturation\_round\_closed},
+  \texttt{saturation\_mean\_quad}) re-derives the specific polynomial
+  inequality it needs inline via \texttt{ring}/\texttt{nlinarith}, in the
+  same spirit as the push protocol's reverse-Markov bound, which is also
+  not isolated as its own named lemma.
+\end{remark}
+
+\section{Elementary inequalities}\label{sec:ineq}
+
+\begin{lemma}[Quadratic-tight logarithm bound]\label{lem:logquad}
+  \lean{ThreeMajority.log_ge_quadratic}
+  \leanok
+  For $\tfrac12 \le x \le 1$: $(x-1)-(x-1)^2 \le \log x$. (Mathlib's crude
+  linear bound $\log x \ge x-1$ is false for $x<1$ and, worse, plugging the
+  correct one-sided bound $1-\tfrac1x\le\log x$ into the Chernoff exponent
+  $k-\mu-k\log(k/\mu)$ gives exactly $0$ when $k/\mu\to1$ --- useless. This
+  quadratic correction, derived from Mathlib's degree-$3$ Taylor lower bound
+  for $\exp$ by elementary algebra, is what makes the growth-phase Chernoff
+  bound (Lemma~\ref{lem:growthround}) bite.)
+\end{lemma}
+
+\begin{lemma}[Exponential beats any fixed power]\label{lem:exppow}
+  \lean{ThreeMajority.exp_ge_pow, ThreeMajority.exp_ge_cube}
+  \leanok
+  For $x\ge0$ and any $k\in\N$: $x^k/k! \le \exp(x)$ --- the single
+  degree-$k$ term of the Taylor truncation, extracted by dropping every
+  other (nonnegative, since $x\ge0$) term of the sum. The cubic case
+  $k=3$ (\texttt{exp\_ge\_cube}) is the special case used by
+  Lemma~\ref{lem:logquad}. Choosing $k$ large enough relative to a given
+  lower bound on $\log n$ lets $n$ be shown to dominate any fixed
+  polynomial in $\log n$ using only a \emph{modest} such lower bound
+  (Stage 2b, Lemma~\ref{lem:stage2b}, and the final numeric bound
+  Lemma~\ref{lem:mainfailclean}) --- a single low-degree truncation, such
+  as the cubic case alone, would instead force $\log n$ to be
+  astronomically large.
+\end{lemma}
+
+\begin{lemma}[Tangent-line log bound]\label{lem:logtangent}
+  \lean{ThreeMajority.log_le_tangent_div, ThreeMajority.exp_three_ge_twenty}
+  \leanok
+  For $L>0$ and any reference point $c>0$: $\log L \le \log c - 1 + L/c$,
+  from the crude bound $\log t \le t - 1$ applied to $t = L/c$; tight at
+  $L=c$ (equality there), unlike a bound tangent at a single globally-fixed
+  point, so choosing $c$ near the $L$ actually in play gives a far sharper
+  bound. Also records $\exp(3)\ge20$ (cubing the standard $10$-digit lower
+  bound on $e$), used to instantiate $c=\exp(3)$ below.
+\end{lemma}
+
+\begin{lemma}[Log-log bound]\label{lem:loglog}
+  \lean{ThreeMajority.log_log_le_of_pos}
+  \leanok
+  \uses{lem:logtangent}
+  For $\log x>0$: $\log\log x \le 2 + (\log x)/20$, from
+  Lemma~\ref{lem:logtangent} tangent at the reference point
+  $c=\exp(3)\approx20.09$ (so $\log c = 3$ exactly), combined with
+  $\exp(3)\ge20$ to replace $1/\exp(3)$ by the cruder but rational $1/20$.
+  Far tighter, once $\log x$ is more than a few units above $e$, than a
+  bound tangent at the fixed point $c=e$ (the crude bound $\log t\le t-1$
+  applied directly at $t=(\log x)/e$) --- exactly the regime
+  Lemma~\ref{lem:stage2b} needs. Used only inside Lemma~\ref{lem:stage2b}'s
+  numeric estimate.
+\end{lemma}
+
+\section{An elementary Chernoff bound}\label{sec:chernoff}
+
+The only concentration tool used in the whole development, and the only
+place beyond elementary combinatorics where real exponentials appear.
+
+\begin{lemma}[MGF bound]\label{lem:mgf}
+  \lean{ThreeMajority.avg_exp_le}
+  \leanok
+  \uses{lem:indep}
+  Let $Y_1,\dots,Y_n \colon \gamma \to \{0,1\}$ be the per-agent
+  contributions on the product space $\mathrm{Fin}\ n \to \gamma$ (one
+  independent draw of $\gamma$ per agent), with $\mu=\sum_i\mathrm{avg}(Y_i)$
+  and $X(x) := \sum_i Y_i(x_i)$. Then for every real $t$ (no sign
+  restriction):
+  \[
+    \E[\exp(tX)] \;\le\; \exp\bigl(\mu(e^t-1)\bigr).
+  \]
+  Proved via the independence toolkit (Lemma~\ref{lem:indep}) applied to
+  $x \mapsto \prod_i \exp(tY_i(x_i))$, and the elementary bound
+  $1+y\le e^y$ (Mathlib's \texttt{Real.add\_one\_le\_exp}) at each factor.
+\end{lemma}
+
+\begin{lemma}[Chernoff tail bounds]\label{lem:chernoff}
+  \lean{ThreeMajority.avg_tail_ge, ThreeMajority.avg_tail_le}
+  \leanok
+  \uses{lem:mgf}
+  In the setting of Lemma~\ref{lem:mgf}: for $t\ge0$ and any $k$,
+  $\Pr[X\ge k] \le \exp(\mu(e^t-1)-tk)$ (\texttt{avg\_tail\_ge}, Markov
+  applied to $\exp(tX)$); symmetrically for $t\le0$,
+  $\Pr[X\le k] \le \exp(\mu(e^t-1)-tk)$ (\texttt{avg\_tail\_le}).
+\end{lemma}
+
+\begin{lemma}[Closed-form tail bounds at the optimal $t$]\label{lem:chernofflog}
+  \lean{ThreeMajority.avg_tail_ge_log, ThreeMajority.avg_tail_le_log,
+    ThreeMajority.avg_tail_ge_log_le, ThreeMajority.avg_tail_le_log_ge}
+  \leanok
+  \uses{lem:chernoff}
+  Plugging $t=\log(k/\mu)$ into Lemma~\ref{lem:chernoff}: for $k\ge\mu>0$,
+  \[
+    \Pr[X\ge k] \;\le\; \exp\bigl(k-\mu-k\log(k/\mu)\bigr)
+    \qquad(\texttt{avg\_tail\_ge\_log}),
+  \]
+  and symmetrically for $0<k\le\mu$,
+  $\Pr[X\le k] \le \exp(k-\mu-k\log(k/\mu))$ (\texttt{avg\_tail\_le\_log}).
+  Both closed forms are \emph{mean-scaled}: the exponent depends on the true
+  $\mu$ directly, not on a crude worst-case range/variance proxy, which
+  matters late in the saturation phase once few at-risk agents remain
+  (Lemma~\ref{lem:stage2b}). Two generalized variants take only an
+  \emph{upper} bound $\mu_{\mathrm{ub}}\ge\mu$ (\texttt{avg\_tail\_ge\_log\_le},
+  used by the saturation phase) or a \emph{lower} bound $\mu_{\mathrm{lb}}
+  \le\mu$ (\texttt{avg\_tail\_le\_log\_ge}, used by the growth phase) on the
+  true mean --- monotonicity of the exponent in $\mu$ at the optimal $t$
+  makes both directions sound, and this is the form each phase actually
+  needs, since the exact mean depends on $x=|I|/n$ while the phases only
+  assume an inequality on $|I|$.
+\end{lemma}
+
+\section{Growth phase}\label{sec:growth}
+
+Set $\beta_j = \tfrac1{10}(1.1)^j$ for $j=0,\dots,10$; $\beta_0=0.1$ (the
+hypothesis $X_0\ge0.6n$) and $\beta_{10}>0.25$.
+
+\begin{definition}[Bias schedule]\label{def:growthbias}
+  \lean{ThreeMajority.growthBias, ThreeMajority.growthBias_zero, ThreeMajority.growthBias_nonneg,
+    ThreeMajority.growthBias_mono, ThreeMajority.growthBias_le_of_le,
+    ThreeMajority.growthBias_le_quarter, ThreeMajority.growthBias_ten}
+  \leanok
+  $\mathrm{growthBias}(j) := \tfrac1{10}(\tfrac{11}{10})^j$, the deterministic
+  bias target after $j$ growth rounds; monotone, $\le\tfrac14$ for $j\le9$,
+  and $>\tfrac14$ at $j=10$.
+\end{definition}
+
+\begin{lemma}[Single growth round]\label{lem:growthround}
+  \lean{ThreeMajority.growth_round}
+  \leanok
+  \uses{lem:drift, lem:chernofflog, def:growthbias}
+  Starting from opinion-$1$ fraction $\ge\tfrac12+\beta$
+  ($\tfrac1{10}\le\beta\le\tfrac14$), the probability of \emph{failing} to
+  reach the next bias target (guaranteed growth factor $\tfrac{11}{10}$,
+  comfortably below the true drift factor $\tfrac54$ from
+  Lemma~\ref{lem:drift}) is at most $\exp(-n/10^7)$. Proved by computing a
+  lower bound $\mu_{\mathrm{lb}} = n(\tfrac12+\tfrac54\beta)$ on the true
+  mean via monotonicity of $p$ on $[\tfrac12+\beta,1]$ (an inline
+  \texttt{nlinarith} computation, not a separate lemma), then applying the
+  lower-tail bound \texttt{avg\_tail\_le\_log\_ge} at
+  $k=n(\tfrac12+\tfrac{11}{10}\beta)$, and bounding the resulting exponent
+  using Lemma~\ref{lem:logquad}.
+\end{lemma}
+
+\begin{lemma}[Union bound over growth rounds]\label{lem:growthfail}
+  \lean{ThreeMajority.growth_fail_le}
+  \leanok
+  \uses{lem:growthround}
+  Starting from bias $\mathrm{growthBias}(i)$, after $j$ further rounds
+  (with $i+j\le10$) the probability of failing to reach
+  $\mathrm{growthBias}(i+j)$ is at most $j\exp(-n/10^7)$, by induction on
+  $j$ via the $\mathrm{expList}$-conditioning idiom (mirroring the push
+  protocol's \texttt{Main.lean}).
+\end{lemma}
+
+\begin{lemma}[Phase 1]\label{lem:phase1}
+  \lean{ThreeMajority.growth_phase1}
+  \leanok
+  \uses{lem:growthfail}
+  Starting from opinion-$1$ fraction $\ge\tfrac35$, after $10$ rounds the
+  opinion-$1$ fraction exceeds $\tfrac34$, except with probability
+  $\le10\exp(-n/10^7)$.
+\end{lemma}
+
+\section{Saturation phase}\label{sec:saturation}
+
+Write $U_t = n-X_t$. By Lemma~\ref{lem:phase1}, $U_{10}\le n/4$ except with
+probability $\le10\exp(-n/10^7)$. Getting $U_t$ all the way to
+\emph{exactly} $0$ needs three stages, since a fixed-ratio Chernoff bound
+needs the mean itself to be $\Omega(\log n)$ for a polynomially-small
+per-round failure probability.
+
+\begin{lemma}[General per-round upper-tail bound]\label{lem:satclosed}
+  \lean{ThreeMajority.saturation_round_closed, ThreeMajority.saturation_round_generic}
+  \leanok
+  \uses{def:Ydis, lem:chernofflog}
+  Given a reference dissent bound $U_t\le M\le n/4$ and any target
+  $k\ge\tfrac58M$ (an upper bound $\mu_{\mathrm{ub}}=\tfrac58M$ on the true
+  one-round mean, via $1-p(x)=(1-x)^2(1+2x)\le\tfrac58(1-x)$ for
+  $x\ge\tfrac34$), the probability the next dissent count exceeds $k$ is at
+  most $\exp(k-\tfrac58M-k\log(k/(\tfrac58M)))$
+  (\texttt{saturation\_round\_closed}); the same conclusion holds for any
+  directly-supplied upper bound $\mu_{\mathrm{ub}}$ on the true mean
+  (\texttt{saturation\_round\_generic}, used by Stage 2b where the
+  quadratic estimate below is the tight one).
+\end{lemma}
+
+\begin{lemma}[Quadratic mean bound]\label{lem:satquad}
+  \lean{ThreeMajority.saturation_mean_quad}
+  \leanok
+  \uses{def:Ydis}
+  For any dissent bound $U_t\le M\le n$, the true one-round mean is at most
+  $3M^2/n$ (the crude bound $1-p(x)\le3(1-x)^2$, dropping the $\tfrac58$
+  refinement). Used both by Stage 2b and by Stage 2c (at $M=10$).
+\end{lemma}
+
+\begin{lemma}[Numeric per-round bound]\label{lem:satnumeric}
+  \lean{ThreeMajority.saturation_round_numeric}
+  \leanok
+  \uses{lem:satclosed, lem:logquad}
+  Lemma~\ref{lem:satclosed}'s exponent, simplified via Mathlib's
+  quadratic-tight Pad\'e bound for $\log$
+  (\texttt{Real.le\_log\_one\_add\_of\_nonneg}) to the closed form
+  $-\lambda^2/(k+\tfrac58M)$, $\lambda=k-\tfrac58M$.
+\end{lemma}
+
+\begin{lemma}[Stage 2a per-round contraction]\label{lem:satcontract}
+  \lean{ThreeMajority.saturation_round_contract}
+  \leanok
+  \uses{lem:satnumeric}
+  Guaranteed contraction factor $0.7$ (vs.\ the true $\tfrac58$): failure
+  probability $\le\exp(-M/250)$.
+\end{lemma}
+
+\begin{definition}[Deterministic dissent target]\label{def:satafter}
+  \lean{ThreeMajority.satAfter, ThreeMajority.satAfter_ge_floor, ThreeMajority.satAfter_zero,
+    ThreeMajority.satAfter_le_of_le, ThreeMajority.satAfter_contract_le}
+  \leanok
+  $\mathrm{satAfter}(n,M,i) := \max(500\log n,\ (0.7)^i M)$, the target
+  dissent bound after $i$ Stage 2a rounds, clamped below at the floor
+  $500\log n$; written in closed form (not recursively) so shifts by one
+  round agree definitionally on the unclamped branch.
+\end{definition}
+
+\begin{lemma}[Stage 2a, union bound]\label{lem:satfail}
+  \lean{ThreeMajority.saturation_fail_le}
+  \leanok
+  \uses{lem:satcontract, def:satafter}
+  Starting from a dissent bound $M$ ($500\log n\le M\le n/4$), offset $i$
+  rounds in, the probability the dissent count exceeds
+  $\mathrm{satAfter}(n,M,i+j)$ after $j$ further rounds is at most
+  $j\,n^{-2}$, by induction on $j$ via the same $\mathrm{expList}$-
+  conditioning idiom as Lemma~\ref{lem:growthfail}, with the tail direction
+  flipped (dissent shrinking rather than opinion-$1$ count growing).
+\end{lemma}
+
+\begin{lemma}[Stage 2a, wrapped]\label{lem:stage2a}
+  \lean{ThreeMajority.T2a, ThreeMajority.satAfter_quarter_le_floor, ThreeMajority.saturation_stage2a}
+  \leanok
+  \uses{lem:satfail}
+  With $T_{2a}(n) := \ceil{6\log n}$: starting from any dissent bound
+  $\le n/4$, after $T_{2a}(n)$ rounds the dissent count exceeds the floor
+  $500\log n$ with probability at most $T_{2a}(n)\cdot n^{-2}$.
+\end{lemma}
+
+\begin{lemma}[Stage 2b]\label{lem:stage2b}
+  \lean{ThreeMajority.saturation_stage2b}
+  \leanok
+  \uses{lem:satquad, lem:satclosed, lem:exppow, lem:loglog}
+  Provided $\log n\ge30$: whenever $U_t\le500\log n$,
+  $\Pr[U_{t+1}>10] \le \exp(-\log n) = 1/n$. One round, jumping from the
+  $\Theta(\log n)$ floor directly to the fixed constant $10$: since the
+  mean is already tiny ($\Theta((\log n)^2/n)$), this single round has an
+  astronomically small failure probability once $n$ is large enough to beat
+  the relevant polynomial in $\log n$, which a degree-$11$ instance of
+  Lemma~\ref{lem:exppow}, combined with the tighter tangent-line bound of
+  Lemma~\ref{lem:loglog}, already secures at this modest threshold.
+\end{lemma}
+
+\begin{lemma}[Stage 2c]\label{lem:stage2c}
+  \lean{ThreeMajority.saturation_stage2c}
+  \leanok
+  \uses{lem:satquad}
+  Whenever $U_t\le10$: $\Pr[U_{t+1}\ge1] \le 300/n$, via ordinary Markov
+  applied to the nonnegative-integer $U_{t+1}$ ($\E[U_{t+1}]\le300/n$ by
+  Lemma~\ref{lem:satquad} at $M=10$) --- no concentration needed for the
+  very last step.
+\end{lemma}
+
+\section{Proof of the main theorem}\label{sec:proof-main}
+
+\begin{lemma}[Stages 2b+2c combined]\label{lem:sat2b2c}
+  \lean{ThreeMajority.ne_univ_iff_pos_dissent, ThreeMajority.saturation_2b2c}
+  \leanok
+  \uses{lem:stage2b, lem:stage2c}
+  Two rounds, from $U_t\le500\log n$ to \emph{exactly} $U=0$, with total
+  failure probability $\le\exp(-\log n)+300/n$, by chaining
+  Lemma~\ref{lem:stage2b} then Lemma~\ref{lem:stage2c} via
+  $\mathrm{expList}$-conditioning.
+\end{lemma}
+
+\begin{lemma}[All three saturation stages combined]\label{lem:sat2a2b2c}
+  \lean{ThreeMajority.saturation_2a2b2c}
+  \leanok
+  \uses{lem:stage2a, lem:sat2b2c}
+  $T_{2a}(n)+2$ rounds, from $U_t\le n/4$ to exactly $U=0$, with total
+  failure probability $\le T_{2a}(n)\cdot n^{-2} + \exp(-\log n) + 300/n$.
+\end{lemma}
+
+\begin{theorem}[Main failure bound, raw form]\label{lem:mainfail}
+  \lean{ThreeMajority.majority3_consensus_fail_le}
+  \leanok
+  \uses{lem:phase1, lem:sat2a2b2c}
+  For $\log n\ge30$ and $|I_0|\ge\tfrac35n$: over $10+(T_{2a}(n)+2)$
+  rounds,
+  \[
+    \Pr[I_T\ne V] \;\le\; 10e^{-n/10^7}
+      + \bigl(T_{2a}(n)\,n^{-2} + e^{-\log n} + 300/n\bigr),
+  \]
+  by gluing Lemma~\ref{lem:phase1} (growth) to
+  Lemma~\ref{lem:sat2a2b2c} (saturation), exactly as the push protocol's
+  \texttt{prNotAllInformed\_le} glues its own two phases.
+\end{theorem}
+
+\begin{theorem}[Clean numeric bound]\label{lem:mainfailclean}
+  \lean{ThreeMajority.hfloor4_of_hbig, ThreeMajority.majority3_consensus_fail_le_clean}
+  \leanok
+  \uses{lem:mainfail, lem:exppow}
+  Under the same hypotheses, the four error terms of
+  Theorem~\ref{lem:mainfail} are each bounded by $O(1/n)$ using
+  Lemma~\ref{lem:exppow} (to show $n$ dominates the relevant polynomials in
+  $\log n$ once $\log n\ge30$), giving the single clean bound
+  $\Pr[I_T\ne V] \le 500/n$.
+\end{theorem}
+
+With $T = 10+(T_{2a}(n)+2)$, Theorem~\ref{thm:main}
+(\texttt{majority3\_consensus\_whp}) follows from
+Theorem~\ref{lem:mainfailclean} by
+$\Pr[I_T=V] = 1-\Pr[I_T\ne V] \ge 1-500/n$.
+
+\section{The Lean formalization}\label{sec:lean}
+
+The argument above is fully formalized (no \texttt{sorry}) in the
+accompanying repository (library \texttt{ThreeMajority}, namespace
+\texttt{ThreeMajority}). File structure (dependency order):
+\texttt{Prob.lean} (Section~\ref{sec:prelim}: the same finite-uniform
+\texttt{avg}/\texttt{expList} machinery as
+\texttt{rumor\_spread/RumorSpread/Prob.lean}, copied since the two Lean
+projects are independent packages, plus the new independence toolkit
+\texttt{avg\_prod\_pi} and friends), \texttt{Model.lean}
+(Section~\ref{sec:model}), \texttt{Bounds.lean} (Section~\ref{sec:ineq}),
+\texttt{Chernoff.lean} (Section~\ref{sec:chernoff}), \texttt{OneRound.lean}
+(Section~\ref{sec:map}), \texttt{Growth.lean} (Section~\ref{sec:growth}),
+\texttt{Saturation.lean} (Section~\ref{sec:saturation}), \texttt{Main.lean}
+(Section~\ref{sec:proof-main} and the main theorem). Design constraint
+preserved from \texttt{rumor\_spread}: no measure theory, no
+\texttt{PMF}/\texttt{ENNReal}, no Mathlib \texttt{ProbabilityTheory}
+kernels --- everything is finite sums, plus \texttt{Real.exp}/\texttt{Real.log}
+where the Chernoff bound genuinely needs them (structurally central here,
+unlike the push protocol, where \texttt{Real.exp} appears only in a numeric
+side lemma).
+
+\begin{thebibliography}{9}
+\bibitem{DGMSS11} B.~Doerr, L.A.~Goldberg, L.~Minder, T.~Sauerwald,
+C.~Scheideler. \emph{Stabilizing consensus with the power of two choices}.
+SPAA 2011.
+\bibitem{BCNPS15} L.~Becchetti, A.~Clementi, E.~Natale, F.~Pasquale,
+R.~Silvestri. \emph{Plurality consensus in the gossip model}. SODA 2015.
+\end{thebibliography}

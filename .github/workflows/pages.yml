@@ -1,0 +1,279 @@
+name: Build and deploy the Pages site
+
+# Builds, for every Lean subproject, its leanblueprint (web + pdf) and its
+# doc-gen4 API docs, then assembles them under the repo-root Jekyll landing
+# page in `home_page/` and publishes the result to GitHub Pages:
+#
+#   /                              home_page/index.md (the Leanamycs landing page)
+#   /<project>/blueprint/          leanblueprint web version
+#   /<project>/blueprint.pdf       leanblueprint pdf version
+#   /<project>/docs/               doc-gen4 API docs
+#
+# This is the multi-project equivalent of leanprover-community/docgen-action,
+# which cannot be used as-is here: it runs `leanblueprint`, `lake exe
+# checkdecls` and the Jekyll build relative to $GITHUB_WORKSPACE rather than
+# relative to its own `lake-package-directory`, so it assumes one Lean package
+# at the repository root. The steps below deliberately mirror that action's
+# (see its `action.yml` and `scripts/build_docs.sh`), just scoped per project.
+#
+# NOTE: for the deployment to succeed, Pages must be enabled for the repository
+# with "Source: GitHub Actions" (Settings -> Pages). Until then this workflow
+# builds fine but the final deploy step fails.
+
+on:
+  push:
+    branches: [main]
+  # On a pull request everything except the API docs is built (blueprint,
+  # checkdecls, Jekyll) and nothing is deployed. The API docs are skipped
+  # there because both projects `import Mathlib`, so a full doc-gen4 run costs
+  # the better part of an hour and would say nothing a `main` build won't.
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deployments race, and don't cancel one in flight: a
+# half-deployed Pages site is worse than a slightly stale one. Pull-request
+# runs deploy nothing, so those are grouped per branch and are cancellable.
+concurrency:
+  group: pages-${{ github.event_name == 'pull_request' && github.head_ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: "Build ${{ matrix.dir }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `package` is the Lake package name in the project's lakefile.toml
+          # (needed by `lake update` in the docs build); `lib` is the lean_lib
+          # whose `:docs` facet doc-gen4 builds.
+          - dir: rumor_spread
+            package: rumor_spread
+            lib: RumorSpread
+          - dir: 3-majority
+            package: three_majority
+            lib: ThreeMajority
+
+    steps:
+      - name: Cleanup to free disk space
+        # texlive-full (pulled below to build the blueprint) plus a full
+        # Mathlib doc build are large enough that the runner's default free
+        # space isn't enough without this.
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.0
+        with:
+          tool-cache: false
+          android: true
+          dotnet: false
+          haskell: false
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # some blueprint tooling inspects the git history
+
+      - name: Build the Lean project
+        uses: leanprover/lean-action@434f25c2f80ded67bba02502ad3a86f25db50709 # 2025-07-02
+        with:
+          lake-package-directory: ${{ matrix.dir }}
+          build-args: --log-level=warning
+
+      - name: Build the blueprint
+        uses: xu-cheng/texlive-action@f886de8159e5952a131848a5fa9c3196a2132b5d # v2
+        with:
+          docker_image: ghcr.io/xu-cheng/texlive-full:20250401
+          run: |
+            set -eu
+            apk update
+            apk add --update make py3-pip git pkgconfig graphviz graphviz-dev gcc musl-dev
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
+            python3 -m venv env
+            . env/bin/activate
+            pip install --upgrade pip requests wheel
+            # Pinned past docgen-action@v1's version of this step: the
+            # `pip install --global-option=...` spelling it still ships is
+            # rejected outright by pip 26.x ("no such option").
+            pip install pygraphviz \
+              --config-settings="--global-option=build_ext" \
+              --config-settings="--global-option=-L/usr/lib/graphviz/" \
+              --config-settings="--global-option=-R/usr/lib/graphviz/"
+            pip install leanblueprint
+
+            # Deliberately NOT `leanblueprint pdf` / `leanblueprint web`: that
+            # CLI resolves the lakefile and the blueprint directory relative to
+            # the *git* root (`Repo(".", search_parent_directories=True)`), so
+            # in this monorepo it looks for /lakefile.toml and /blueprint and
+            # bails out. These are the two commands it would have run anyway
+            # (see leanblueprint/client.py: mk_pdf, mk_web); the `leanblueprint`
+            # install above is still needed, for the plasTeX plugin that the
+            # blueprint's plastex.cfg loads and that writes blueprint/lean_decls.
+            cd "${{ matrix.dir }}/blueprint"
+            mkdir -p print web
+            cd src
+            latexmk -output-directory=../print
+            # mk_pdf copies the bibliography across so the web build can reuse it.
+            if [ -f ../print/print.bbl ]; then cp ../print/print.bbl web.bbl; fi
+            plastex -c plastex.cfg web.tex
+
+            OUT="$GITHUB_WORKSPACE/site/${{ matrix.dir }}"
+            mkdir -p "$OUT"
+            cp ../print/print.pdf "$OUT/blueprint.pdf"
+            cp -r ../web "$OUT/blueprint"
+
+      - name: Take ownership of the container-created files
+        # The step above runs as root inside a Docker container, so everything
+        # it wrote (including blueprint/lean_decls, read by the next step) is
+        # root-owned on the host.
+        run: sudo chown -R "$(id -u):$(id -g)" "${{ matrix.dir }}" site
+
+      - name: Check the declarations named in the blueprint exist
+        working-directory: ${{ matrix.dir }}
+        run: ~/.elan/bin/lake exe checkdecls blueprint/lean_decls
+
+      - name: Build the API documentation
+        if: github.event_name != 'pull_request'
+        working-directory: ${{ matrix.dir }}
+        env:
+          PACKAGE: ${{ matrix.package }}
+          LIB: ${{ matrix.lib }}
+        run: |
+          set -euo pipefail
+          # Resolve doc-gen4 against this project's own toolchain, in a
+          # throwaway package, so that adding docs never forces a Mathlib or
+          # toolchain bump on the project itself.
+          DOC_GEN_REV="$(cut -f2 -d: lean-toolchain)"
+          mkdir -p docbuild
+          cat > docbuild/lakefile.toml <<EOF
+          name = "docbuild"
+          reservoir = false
+          version = "0.1.0"
+          packagesDir = "../.lake/packages"
+
+          [[require]]
+          name = "$PACKAGE"
+          path = "../"
+
+          [[require]]
+          scope = "leanprover"
+          name = "doc-gen4"
+          rev = "$DOC_GEN_REV"
+          EOF
+          cd docbuild
+          # MATHLIB_NO_CACHE_ON_UPDATE: works around a non-blocking error
+          # message from Mathlib's post-update hook.
+          MATHLIB_NO_CACHE_ON_UPDATE=1 ~/.elan/bin/lake update "$PACKAGE"
+          ~/.elan/bin/lake build "$LIB:docs"
+
+      - name: Assemble the API documentation
+        if: github.event_name != 'pull_request'
+        working-directory: ${{ matrix.dir }}
+        env:
+          LIB: ${{ matrix.lib }}
+          # A full doc-gen4 run over `import Mathlib` produces ~1.3 GB, almost
+          # all of it documentation for the dependencies; two projects' worth
+          # would blow through the 1 GB GitHub Pages site limit. So publish
+          # this project's own modules plus the shared shell (search index,
+          # scripts, stylesheets) and drop the dependency trees, which brings
+          # each project to well under 100 MB. Set this to `false` to publish
+          # the dependency documentation too — expect a multi-GB site.
+          PRUNE_DEPENDENCY_DOCS: "true"
+        run: |
+          set -euo pipefail
+          DOC=docbuild/.lake/build/doc
+          if [ "$PRUNE_DEPENDENCY_DOCS" = "true" ]; then
+            # Keep: this project's modules, `declarations/` (the search
+            # index), `find/` (the search redirector), and every top-level
+            # file. Drop every other top-level directory.
+            for d in "$DOC"/*/; do
+              name="$(basename "$d")"
+              case "$name" in
+                "$LIB" | declarations | find) ;;
+                *) rm -rf "$d" ;;
+              esac
+            done
+          fi
+          mkdir -p "$GITHUB_WORKSPACE/site/${{ matrix.dir }}"
+          cp -r "$DOC" "$GITHUB_WORKSPACE/site/${{ matrix.dir }}/docs"
+          du -sh "$GITHUB_WORKSPACE/site/${{ matrix.dir }}"
+
+      - name: Upload this project's slice of the site
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-${{ matrix.dir }}
+          path: site
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    name: Assemble and deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Collect every project's blueprint and docs into the home page
+        uses: actions/download-artifact@v4
+        with:
+          path: home_page
+          pattern: site-*
+          merge-multiple: true
+
+      - name: Bundle dependencies
+        uses: ruby/setup-ruby@eaecf785f6a34567a6d97f686bbb7bccc1ac1e5c # v1.237.0
+        with:
+          working-directory: home_page
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Build the website using Jekyll
+        working-directory: home_page
+        env:
+          JEKYLL_GITHUB_TOKEN: ${{ github.token }}
+        # Also copies the blueprints and API docs collected above into _site.
+        run: JEKYLL_ENV=production bundle exec jekyll build
+
+      - name: Check every project made it into the assembled site
+        # Jekyll copies the collected directories across as static files rather
+        # than reporting on them, so a project silently missing from the site
+        # would otherwise show up only as 404s after deployment.
+        working-directory: home_page
+        run: |
+          set -uo pipefail
+          status=0
+          check() {
+            if [ -e "$1" ]; then echo "ok       $1"; else echo "MISSING  $1"; status=1; fi
+          }
+          for p in rumor_spread 3-majority; do
+            check "_site/$p/blueprint/index.html"
+            check "_site/$p/blueprint/dep_graph_document.html"
+            check "_site/$p/blueprint.pdf"
+            # The API docs are deliberately skipped on pull requests.
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              check "_site/$p/docs/index.html"
+              check "_site/$p/docs/find/index.html"
+            fi
+          done
+          du -sh _site
+          exit $status
+
+      - name: Upload the assembled site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: home_page/_site
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
