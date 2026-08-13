@@ -21,11 +21,11 @@ sends the rumor to a uniformly random other node each round. Starting from a
 single informed node, after $O(\log n)$ rounds **all** nodes are informed
 with high probability. The main theorem is `RumorPush.push_informs_all_whp`.
 
-* [Blueprint](rumor_spread/blueprint/) · [as pdf](rumor_spread/blueprint.pdf) ·
-  [dependency graph](rumor_spread/blueprint/dep_graph_document.html)
-* [API docs](rumor_spread/docs/)
-* [Source](https://github.com/natema/Leanamycs/tree/main/rumor_spread)
-
+* [Blueprint]({{ '/rumor_spread/blueprint/' | relative_url }}) · [as pdf]({{ '/rumor_spread/blueprint.pdf' | relative_url }}) ·
+  [dependency graph]({{ '/rumor_spread/blueprint/dep_graph_document.html' | relative_url }})
+* [API docs]({{ '/rumor_spread/docs/' | relative_url }})
+* [Source](https://github.com/leanamycs/leanamycs/tree/main/rumor_spread)
+   
 ## 3-majority dynamics
 
 In the *3-majority* model on $n$ fully-mixing agents, each agent holds one of
@@ -35,10 +35,10 @@ vs. $40\%$, after $O(\log n)$ rounds **all** agents hold the initial majority
 opinion with probability $1 - O(1/n)$. The main theorem is
 `ThreeMajority.majority3_consensus_whp`.
 
-* [Blueprint](3-majority/blueprint/) · [as pdf](3-majority/blueprint.pdf) ·
-  [dependency graph](3-majority/blueprint/dep_graph_document.html)
-* [API docs](3-majority/docs/)
-* [Source](https://github.com/natema/Leanamycs/tree/main/3-majority)
+* [Blueprint]({{ '/3-majority/blueprint/' | relative_url }}) · [as pdf]({{ '/3-majority/blueprint.pdf' | relative_url }}) ·
+  [dependency graph]({{ '/3-majority/blueprint/dep_graph_document.html' | relative_url }})
+* [API docs]({{ '/3-majority/docs/' | relative_url }})
+* [Source](https://github.com/leanamycs/leanamycs/tree/main/3-majority)
 
 ---
 
