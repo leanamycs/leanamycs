@@ -26,10 +26,10 @@ description: Lean 4 formalizations of opinion dynamics and related distributed p
 # relative_url` under JEKYLL_ENV=production, which already supplies the
 # repository-name prefix. Setting baseurl here too would double it.
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://natema.github.io/Leanamycs"
+url: "https://leanamycs.github.io/leanamycs"
 twitter_username:
-github_username: natema
-repository: natema/Leanamycs
+github_username: leanamycs
+repository: leanamycs/Leanamycs
 
 # Shown in the page footer. Deliberately not taken from GitHub metadata: the
 # repository has a single owner, but the work has three authors.
