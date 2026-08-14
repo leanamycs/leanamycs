@@ -21,7 +21,7 @@ lemma-for-lemma, is in [latex/three_majority.tex](latex/three_majority.tex).
 
 **[Blueprint](https://leanamycs.github.io/leanamycs/3-majority/blueprint/)** ·
 **[Blueprint as pdf](https://leanamycs.github.io/leanamycs/3-majority/blueprint.pdf)** ·
-**[Dependency graph](https://leanamycs.github.io/leanamycs/3-majority/docs/](https://leanamycs.github.io/leanamycs/3-majority/blueprint/dep_graph_document.html)** ·
+**[Dependency graph](https://leanamycs.github.io/leanamycs/3-majority/blueprint/dep_graph_document.html)** ·
 **[API docs](https://leanamycs.github.io/leanamycs/rumor_spread/docs/)**
 
 The blueprint ([blueprint/src/content.tex](blueprint/src/content.tex)) states
