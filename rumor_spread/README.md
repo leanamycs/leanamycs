@@ -17,10 +17,10 @@ exchange for a minimal analytic toolkit.
 A self-contained paper proof, written to mirror the formalization
 lemma-for-lemma, is in [latex/rumor_push.tex](latex/rumor_push.tex).
 
-**[Blueprint](https://natema.github.io/Leanamycs/rumor_spread/blueprint/)** ·
-**[Blueprint as pdf](https://natema.github.io/Leanamycs/rumor_spread/blueprint.pdf)** ·
-**[Dependency graph](https://natema.github.io/Leanamycs/rumor_spread/blueprint/dep_graph_document.html)** ·
-**[API docs](https://natema.github.io/Leanamycs/rumor_spread/docs/)**
+**[Blueprint](https://leanamycs.github.io/leanamycs/rumor_spread/blueprint/)** ·
+**[Blueprint as pdf](https://leanamycs.github.io/leanamycs/rumor_spread/blueprint.pdf)** ·
+**[Dependency graph](https://leanamycs.github.io/leanamycs/rumor_spread/blueprint/dep_graph_document.html)** ·
+**[API docs](https://leanamycs.github.io/leanamycs/rumor_spread/docs/)**
 
 The blueprint ([blueprint/src/content.tex](blueprint/src/content.tex)) states
 every lemma with a `\lean{}` tag pointing to its Lean declaration and a
