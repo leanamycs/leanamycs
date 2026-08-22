@@ -1,47 +1,14 @@
-# Welcome to Jekyll!
-#
-# This config file is meant for settings that affect your whole blog, values
-# which you are expected to set up once and rarely edit after that. If you find
-# yourself editing this file very often, consider using Jekyll's data files
-# feature for the data you need to update frequently.
-#
-# For technical reasons, this file is *NOT* reloaded automatically when you use
-# 'bundle exec jekyll serve'. If you change this file, please restart the server process.
-#
-# If you need help with YAML syntax, here are some quick references for you:
-# https://learn-the-web.algonquindesign.ca/topics/markdown-yaml-cheat-sheet/#yaml
-# https://learnxinyminutes.com/docs/yaml/
-#
-# Site settings
-# These are used to personalize your new site. If you look in the HTML files,
-# you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
-# You can create any custom variable you would like, and they will be accessible
-# in the templates via {{ site.myvariable }}.
-
 title: Leanamycs
-#email: your-email@example.com
 description: Lean 4 formalizations of opinion dynamics and related distributed processes
-# `baseurl` stays empty even though the site is served from /Leanamycs/: the
-# Cayman layout builds asset URLs as `site.github.repository_name | ... |
-# relative_url` under JEKYLL_ENV=production, which already supplies the
-# repository-name prefix. Setting baseurl here too would double it.
 baseurl: "/leanamycs"
 url: "https://leanamycs.github.io"
 twitter_username:
 github_username: leanamycs
 repository: leanamycs/Leanamycs
 
-# Shown in the page footer. Deliberately not taken from GitHub metadata: the
-# repository has a single owner, but the work has three authors.
 authors: Aakash Kumar, Maria Sofia Bucarelli and Emanuele Natale
 
-# Build settings
 remote_theme: pages-themes/cayman@v0.2.0
 plugins:
   - jekyll-remote-theme
   - jekyll-github-metadata
-
-# Note: each Lean subproject's blueprint and API docs are dropped in here by CI
-# (see /.github/workflows/pages.yml) as `rumor_spread/` and `3-majority/` just
-# before `jekyll build` runs. They are pre-rendered HTML with no front matter,
-# so Jekyll treats them as static files and copies them into `_site` verbatim.
