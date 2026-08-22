@@ -42,16 +42,7 @@ opinion with probability $1 - O(1/n)$. The main theorem is
 
 ---
 
-The two proofs sit in genuinely different regimes. The informed set of the
-push protocol only ever grows, so its analysis gets by with a counting
-argument over "good rounds"; the 3-majority opinion count is *not* monotone
-in the round index — an unlucky round can shrink it — so honest
-concentration around the mean trajectory is needed in every round, supplied
-by a self-contained Chernoff bound proved from $1 + x \le e^x$.
-
 Each project is an independent Lean package (its own `lakefile.toml` and
 toolchain) living in its own subdirectory of the repository; this page is the
 shared landing page linking out to both. See each subdirectory's own
 `README.md` for build instructions.
-
-[Zulip chat for Lean](https://leanprover.zulipchat.com/) for coordination.
